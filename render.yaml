@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: appradar-pro
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
