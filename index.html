@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>AppRadar PRO</title>
+<title>AppRadar PRO — Store Login</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -11,30 +11,121 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#05080f;color:#c8d8f0;font-family:'Rajdhani',sans-serif;min-height:100vh}
-::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#1a2540;border-radius:3px}
-input[type=range]{accent-color:#00d4ff;width:100%}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:#1a2540;border-radius:3px}
+input{font-family:'Rajdhani',sans-serif}
 @keyframes blink{0%,100%{opacity:1;box-shadow:0 0 6px #00e676}50%{opacity:.3}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const{useState,useEffect}=React;
+const{useState,useEffect,useCallback}=React;
 
-// ── PLATFORM CONFIG ───────────────────────────────────────────────────────────
-const PL={
-  gp:{name:"Google Play Store",short:"Play",  icon:"▶", color:"#34d399",bg:"rgba(52,211,153,.12)", border:"rgba(52,211,153,.3)", category:"Mobile"},
-  as:{name:"Apple App Store",  short:"iOS",   icon:"🍎",color:"#60a5fa",bg:"rgba(96,165,250,.12)", border:"rgba(96,165,250,.3)", category:"Mobile"},
-  ft:{name:"Amazon Fire TV",   short:"Fire",  icon:"🔥",color:"#fb923c",bg:"rgba(251,146,60,.12)", border:"rgba(251,146,60,.3)", category:"Smart TV"},
-  sm:{name:"Samsung Galaxy",   short:"Sam",   icon:"⬡", color:"#a78bfa",bg:"rgba(167,139,250,.12)",border:"rgba(167,139,250,.3)",category:"Smart TV"},
-  lg:{name:"LG Content Store", short:"LG",    icon:"◈", color:"#f87171",bg:"rgba(248,113,113,.12)",border:"rgba(248,113,113,.3)",category:"Smart TV"},
-  rk:{name:"Roku Channel",     short:"Roku",  icon:"◉", color:"#fbbf24",bg:"rgba(251,191,36,.12)", border:"rgba(251,191,36,.3)", category:"Smart TV"},
-  wb:{name:"Web / PWA",        short:"Web",   icon:"🌐",color:"#00d4ff",bg:"rgba(0,212,255,.12)",  border:"rgba(0,212,255,.3)",  category:"Web"},
-  az:{name:"Amazon Appstore",  short:"Amazon",icon:"📦",color:"#ff9900",bg:"rgba(255,153,0,.12)",  border:"rgba(255,153,0,.3)",  category:"Mobile"},
-  hw:{name:"Huawei AppGallery",short:"Huawei",icon:"🔷",color:"#cf0a2c",bg:"rgba(207,10,44,.12)",  border:"rgba(207,10,44,.3)",  category:"Mobile"},
+// ─── STORE DEFINITIONS ────────────────────────────────────────────────────────
+const STORES=[
+  {
+    id:"gp", name:"Google Play Store", icon:"▶", color:"#34d399",
+    bg:"rgba(52,211,153,.12)", border:"rgba(52,211,153,.3)", category:"Mobile",
+    loginUrl:"https://play.google.com/console",
+    fields:[
+      {key:"email",    label:"Google Account Email",  type:"email",    placeholder:"you@gmail.com"},
+      {key:"password", label:"Google Account Password",type:"password", placeholder:"••••••••••••"},
+    ],
+    note:"Same credentials you use to login to Google Play Console",
+    authMethod:"google_oauth",
+  },
+  {
+    id:"as", name:"Apple App Store", icon:"🍎", color:"#60a5fa",
+    bg:"rgba(96,165,250,.12)", border:"rgba(96,165,250,.3)", category:"Mobile",
+    loginUrl:"https://appstoreconnect.apple.com",
+    fields:[
+      {key:"apple_id", label:"Apple ID (Email)",       type:"email",    placeholder:"you@apple.com"},
+      {key:"password", label:"Apple ID Password",      type:"password", placeholder:"••••••••••••"},
+    ],
+    note:"Same Apple ID you use for App Store Connect",
+    authMethod:"apple_auth",
+  },
+  {
+    id:"ft", name:"Amazon Fire TV", icon:"🔥", color:"#fb923c",
+    bg:"rgba(251,146,60,.12)", border:"rgba(251,146,60,.3)", category:"Smart TV",
+    loginUrl:"https://developer.amazon.com",
+    fields:[
+      {key:"email",    label:"Amazon Developer Email",  type:"email",    placeholder:"you@email.com"},
+      {key:"password", label:"Amazon Developer Password",type:"password", placeholder:"••••••••••••"},
+    ],
+    note:"Same credentials for developer.amazon.com",
+    authMethod:"amazon_auth",
+  },
+  {
+    id:"sm", name:"Samsung Galaxy Store", icon:"⬡", color:"#a78bfa",
+    bg:"rgba(167,139,250,.12)", border:"rgba(167,139,250,.3)", category:"Smart TV",
+    loginUrl:"https://seller.samsungapps.com",
+    fields:[
+      {key:"email",    label:"Samsung Seller Email",    type:"email",    placeholder:"you@email.com"},
+      {key:"password", label:"Samsung Seller Password", type:"password", placeholder:"••••••••••••"},
+    ],
+    note:"Same credentials for seller.samsungapps.com",
+    authMethod:"samsung_auth",
+  },
+  {
+    id:"lg", name:"LG Content Store", icon:"◈", color:"#f87171",
+    bg:"rgba(248,113,113,.12)", border:"rgba(248,113,113,.3)", category:"Smart TV",
+    loginUrl:"https://seller.lgappstv.com",
+    fields:[
+      {key:"email",    label:"LG Seller Email",         type:"email",    placeholder:"you@email.com"},
+      {key:"password", label:"LG Seller Password",      type:"password", placeholder:"••••••••••••"},
+    ],
+    note:"Same credentials for seller.lgappstv.com",
+    authMethod:"lg_auth",
+  },
+  {
+    id:"rk", name:"Roku Channel Store", icon:"◉", color:"#fbbf24",
+    bg:"rgba(251,191,36,.12)", border:"rgba(251,191,36,.3)", category:"Smart TV",
+    loginUrl:"https://developer.roku.com",
+    fields:[
+      {key:"email",    label:"Roku Developer Email",    type:"email",    placeholder:"you@email.com"},
+      {key:"password", label:"Roku Developer Password", type:"password", placeholder:"••••••••••••"},
+    ],
+    note:"Same credentials for developer.roku.com",
+    authMethod:"roku_auth",
+  },
+  {
+    id:"az", name:"Amazon Appstore", icon:"📦", color:"#ff9900",
+    bg:"rgba(255,153,0,.12)", border:"rgba(255,153,0,.3)", category:"Mobile",
+    loginUrl:"https://developer.amazon.com",
+    fields:[
+      {key:"email",    label:"Amazon Developer Email",  type:"email",    placeholder:"you@email.com"},
+      {key:"password", label:"Amazon Developer Password",type:"password", placeholder:"••••••••••••"},
+    ],
+    note:"Same Amazon developer account as Fire TV",
+    authMethod:"amazon_auth",
+  },
+  {
+    id:"hw", name:"Huawei AppGallery", icon:"🔷", color:"#cf0a2c",
+    bg:"rgba(207,10,44,.12)", border:"rgba(207,10,44,.3)", category:"Mobile",
+    loginUrl:"https://appgallery.huawei.com",
+    fields:[
+      {key:"email",    label:"Huawei Developer Email",  type:"email",    placeholder:"you@email.com"},
+      {key:"password", label:"Huawei Developer Password",type:"password",placeholder:"••••••••••••"},
+    ],
+    note:"Same credentials for AppGallery Connect",
+    authMethod:"huawei_auth",
+  },
+];
+
+// ─── DEMO PLATFORM DATA ───────────────────────────────────────────────────────
+const DEMO_DATA={
+  gp:{version:"4.2.1",build:"421",status:"approved",rollout:100,crash:0.42,anr:0.08,apps:[{name:"StreamMax",pkg:"com.streammax.app",version:"4.2.1",status:"approved",crash:0.42,anr:0.08}]},
+  as:{version:"4.2.1",build:"210",status:"approved",rollout:100,crash:0.38,anr:0.06,apps:[{name:"StreamMax",pkg:"com.streammax.ios",version:"4.2.1",status:"approved",crash:0.38,anr:0.06}]},
+  ft:{version:"4.2.0",build:"185",status:"approved",rollout:100,crash:0.51,anr:0.11,apps:[{name:"StreamMax",pkg:"com.streammax.firetv",version:"4.2.0",status:"approved",crash:0.51,anr:0.11}]},
+  sm:{version:"4.1.9",build:"178",status:"review",  rollout:0,  crash:0.61,anr:0.13,apps:[{name:"StreamMax",pkg:"com.streammax.samsung",version:"4.1.9",status:"review",crash:0.61,anr:0.13}]},
+  lg:{version:"4.1.5",build:"160",status:"approved",rollout:100,crash:0.44,anr:0.09,apps:[{name:"StreamMax",pkg:"com.streammax.lg",version:"4.1.5",status:"approved",crash:0.44,anr:0.09}]},
+  rk:{version:"4.0.9",build:"140",status:"pending", rollout:0,  crash:null, anr:null, apps:[{name:"StreamMax",pkg:"com.streammax.roku",version:"4.0.9",status:"pending",crash:null,anr:null}]},
+  az:{version:"4.1.9",build:"195",status:"approved",rollout:100,crash:0.58,anr:0.12,apps:[{name:"StreamMax",pkg:"com.streammax.amazon",version:"4.1.9",status:"approved",crash:0.58,anr:0.12}]},
+  hw:{version:"4.1.5",build:"162",status:"rejected",rollout:0,  crash:0.77,anr:0.16,apps:[{name:"StreamMax",pkg:"com.streammax.huawei",version:"4.1.5",status:"rejected",crash:0.77,anr:0.16}]},
 };
 
 const ST={
@@ -45,433 +136,487 @@ const ST={
   live:    {label:"LIVE",     color:"#00d4ff",bg:"rgba(0,212,255,.1)", border:"rgba(0,212,255,.3)"},
 };
 
-// ── DEMO DATA (shown until real data loads) ────────────────────────────────────
-const DEMO=[
-  {id:"gp",currentVer:"4.2.1",buildNo:"421",   prevVer:"4.1.0",prevBuild:"410",status:"approved",rollout:100,force:true, crash:0.42,anr:0.08,lastUpdated:"2026-03-05",remarks:"All checks passed.",isLive:false},
-  {id:"as",currentVer:"4.2.1",buildNo:"210",   prevVer:"4.1.0",prevBuild:"198",status:"approved",rollout:100,force:true, crash:0.38,anr:0.06,lastUpdated:"2026-03-04",remarks:"",isLive:false},
-  {id:"ft",currentVer:"4.2.0",buildNo:"185",   prevVer:"4.0.9",prevBuild:"170",status:"approved",rollout:100,force:false,crash:0.51,anr:0.11,lastUpdated:"2026-02-28",remarks:"",isLive:false},
-  {id:"sm",currentVer:"4.1.9",buildNo:"178",   prevVer:"4.1.5",prevBuild:"165",status:"review",  rollout:0,  force:false,crash:0.61,anr:0.13,lastUpdated:"2026-03-06",remarks:"Samsung review in progress.",isLive:false},
-  {id:"lg",currentVer:"4.1.5",buildNo:"160",   prevVer:"4.1.2",prevBuild:"148",status:"approved",rollout:100,force:false,crash:0.44,anr:0.09,lastUpdated:"2026-02-20",remarks:"",isLive:false},
-  {id:"rk",currentVer:"4.0.9",buildNo:"140",   prevVer:"4.0.5",prevBuild:"128",status:"pending", rollout:0,  force:false,crash:null, anr:null, lastUpdated:"2026-02-10",remarks:"Submission pending.",isLive:false},
-  {id:"wb",currentVer:"4.2.1",buildNo:"web-88",prevVer:"4.2.0",prevBuild:"web-82",status:"live", rollout:100,force:false,crash:0.12,anr:0.02,lastUpdated:"2026-03-05",remarks:"CDN deploy OK.",isLive:false},
-  {id:"az",currentVer:"4.1.9",buildNo:"195",   prevVer:"4.1.5",prevBuild:"180",status:"approved",rollout:100,force:false,crash:0.58,anr:0.12,lastUpdated:"2026-02-26",remarks:"",isLive:false},
-  {id:"hw",currentVer:"4.1.5",buildNo:"162",   prevVer:"4.1.0",prevBuild:"150",status:"rejected",rollout:0,  force:false,crash:0.77,anr:0.16,lastUpdated:"2026-03-05",remarks:"HMS Core version mismatch.",isLive:false},
-];
-
-// ── MERGE live data over demo ─────────────────────────────────────────────────
-function mergeData(demo, liveData) {
-  if (!liveData?.platforms) return demo;
-  const storeMap={google_play:"gp",app_store:"as",fire_tv:"ft",samsung:"sm",lg:"lg",roku:"rk"};
-  return demo.map(row => {
-    const storeKey = Object.entries(storeMap).find(([,v])=>v===row.id)?.[0];
-    const live = storeKey && liveData.platforms[storeKey];
-    if (!live?.connected || !live?.apps?.length) return row;
-    const app = live.apps[0]; // first app — extend for multi-app later
-    return {
-      ...row,
-      currentVer:  app.versionName  || app.versionString || row.currentVer,
-      buildNo:     app.versionCode  || app.buildNumber   || row.buildNo,
-      status:      app.status       || row.status,
-      crash:       app.crash        ?? row.crash,
-      anr:         app.anr          ?? row.anr,
-      lastUpdated: app.lastUpdated  || row.lastUpdated,
-      isLive:      true,
-    };
-  });
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-const cc=v=>v===null?"#4a6080":v<0.5?"#00e676":v<1.5?"#ffab00":"#ff3355";
-const cl=v=>v===null?"N/A":v.toFixed(2)+"%";
 const mn={fontFamily:"'JetBrains Mono',monospace"};
 
-function Tag({sk}){const p=PL[sk];return<span style={{display:"inline-flex",alignItems:"center",gap:3,padding:"2px 8px",borderRadius:5,background:p.bg,border:`1px solid ${p.border}`,color:p.color,...mn,fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>{p.icon} {p.short}</span>;}
-function Badge({status,small}){const s=ST[status]||ST.pending;return<span style={{display:"inline-flex",alignItems:"center",gap:4,padding:small?"2px 7px":"3px 10px",borderRadius:20,background:s.bg,border:`1px solid ${s.border}`,color:s.color,...mn,fontSize:small?9:10,fontWeight:700,whiteSpace:"nowrap"}}><span style={{width:5,height:5,borderRadius:"50%",background:s.color,display:"inline-block"}}/>{s.label}</span>;}
-function LiveDot({isLive}){return isLive?<span style={{...mn,fontSize:8,color:"#00e676",background:"rgba(0,230,118,.1)",border:"1px solid rgba(0,230,118,.3)",borderRadius:3,padding:"1px 5px",marginLeft:4}}>LIVE</span>:<span style={{...mn,fontSize:8,color:"#4a6080",background:"rgba(100,116,139,.1)",border:"1px solid rgba(100,116,139,.2)",borderRadius:3,padding:"1px 5px",marginLeft:4}}>DEMO</span>;}
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const cc=v=>v===null?"#4a6080":v<0.5?"#00e676":v<1.5?"#ffab00":"#ff3355";
+const cl=v=>v===null?"N/A":v.toFixed(2)+"%";
 
-function ForceModal({platform,onConfirm,onClose}){
-  const p=PL[platform.id];
-  const[pct,setPct]=useState(platform.rollout||100);
-  const[forceOn,setForceOn]=useState(platform.force);
-  return<div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",backdropFilter:"blur(8px)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-    <div style={{background:"#0a0f1e",border:"1px solid #243050",borderRadius:18,width:"100%",maxWidth:440}}>
-      <div style={{background:"#0f1628",borderBottom:"1px solid #1a2540",padding:"16px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderRadius:"18px 18px 0 0"}}>
-        <div><div style={{fontSize:17,fontWeight:700,color:"#fff"}}>⚡ Rollout Control</div><div style={{marginTop:5}}><Tag sk={platform.id}/></div></div>
-        <button onClick={onClose} style={{background:"#141d35",border:"1px solid #1a2540",borderRadius:7,width:28,height:28,cursor:"pointer",color:"#4a6080",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-      </div>
-      <div style={{padding:20}}>
-        <div style={{background:"rgba(255,51,85,.07)",border:"1px solid rgba(255,51,85,.2)",borderRadius:9,padding:12,marginBottom:16,fontSize:12,color:"#c8d8f0",lineHeight:1.6}}>⚠️ <strong style={{color:"#ff3355"}}>Force Mode</strong> = users <strong style={{color:"#ff3355"}}>cannot use app</strong> without updating.</div>
-        <div style={{marginBottom:18}}>
-          <div style={{...mn,fontSize:9,color:"#4a6080",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:8}}>ROLLOUT PERCENTAGE</div>
-          <input type="range" min={0} max={100} value={pct} onChange={e=>setPct(Number(e.target.value))}/>
-          <div style={{...mn,fontSize:32,fontWeight:700,color:pct===100?"#00d4ff":"#ffab00",textAlign:"center",letterSpacing:2,margin:"6px 0"}}>{pct}%</div>
-        </div>
-        <div onClick={()=>setForceOn(!forceOn)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#0f1628",border:"1px solid #1a2540",borderRadius:9,padding:"12px 16px",marginBottom:16,cursor:"pointer"}}>
-          <div><div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Force Update Mode</div><div style={{fontSize:11,color:"#4a6080",marginTop:2}}>Mandatory update for all users</div></div>
-          <div style={{width:44,height:24,borderRadius:12,background:forceOn?"#ff3355":"#1a2540",position:"relative",transition:"background .2s",border:`1px solid ${forceOn?"#ff3355":"#243050"}`,flexShrink:0}}>
-            <div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:2,left:forceOn?22:2,transition:"left .2s"}}/>
-          </div>
-        </div>
-        <button onClick={()=>onConfirm(pct,forceOn)} style={{width:"100%",padding:12,borderRadius:9,border:"none",cursor:"pointer",fontSize:14,fontWeight:700,color:"#fff",background:forceOn&&pct===100?"linear-gradient(135deg,#9b1c2e,#ff3355)":"linear-gradient(135deg,#0055ff,#00d4ff)",letterSpacing:1}}>
-          {forceOn&&pct===100?"⚡ DEPLOY FORCE UPDATE":`📈 SET ROLLOUT TO ${pct}%`}
-        </button>
-        <button onClick={onClose} style={{width:"100%",padding:9,borderRadius:8,border:"1px solid #1a2540",background:"transparent",color:"#4a6080",cursor:"pointer",fontSize:13,fontWeight:600,marginTop:8}}>Cancel</button>
-      </div>
-    </div>
-  </div>;
+function Badge({status}){
+  const s=ST[status]||ST.pending;
+  return<span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,background:s.bg,border:`1px solid ${s.border}`,color:s.color,...mn,fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>
+    <span style={{width:5,height:5,borderRadius:"50%",background:s.color,display:"inline-block"}}/>{s.label}
+  </span>;
 }
 
-function SecretsGuide({onClose}){
-  const secrets=[
-    {store:"Google Play",  key:"GOOGLE_SERVICE_ACCOUNT", desc:"Contents of your service account .json file",    where:"play.google.com/console → Setup → API Access → Service Account → Create Key (JSON)"},
-    {store:"Google Play",  key:"GOOGLE_PACKAGE_NAMES",   desc:"Your app package name(s), comma separated",       where:"e.g.  com.myapp.android,com.myapp.tv"},
-    {store:"App Store",    key:"APPLE_KEY_ID",            desc:"Key ID from App Store Connect",                   where:"appstoreconnect.apple.com → Users & Access → Keys → Key ID"},
-    {store:"App Store",    key:"APPLE_ISSUER_ID",         desc:"Issuer ID shown at top of Keys page",             where:"appstoreconnect.apple.com → Users & Access → Keys → Issuer ID"},
-    {store:"App Store",    key:"APPLE_PRIVATE_KEY",       desc:"Full contents of downloaded .p8 key file",        where:"Download from same page — only downloadable once!"},
-    {store:"Fire TV",      key:"AMAZON_CLIENT_ID",        desc:"Client ID from Amazon Developer",                 where:"developer.amazon.com → Settings → Security Profiles → API Keys"},
-    {store:"Fire TV",      key:"AMAZON_CLIENT_SECRET",    desc:"Client Secret from same page",                    where:"developer.amazon.com → Settings → Security Profiles → API Keys"},
-    {store:"Samsung",      key:"SAMSUNG_CLIENT_ID",       desc:"Client ID from Samsung Seller Portal",            where:"seller.samsungapps.com → Account → Seller API → Create"},
-    {store:"Samsung",      key:"SAMSUNG_CLIENT_SECRET",   desc:"Client Secret from same page",                    where:"seller.samsungapps.com → Account → Seller API"},
-    {store:"LG",           key:"LG_API_KEY",              desc:"API Key from LG Seller Lounge",                   where:"seller.lgappstv.com → My Account → API Management"},
-    {store:"LG",           key:"LG_SECRET_KEY",           desc:"Secret Key from same page",                       where:"seller.lgappstv.com → My Account → API Management"},
-    {store:"Roku",         key:"ROKU_CLIENT_ID",          desc:"Client ID from Roku Developer Dashboard",         where:"developer.roku.com → Dashboard → API Keys → Create"},
-    {store:"Roku",         key:"ROKU_CLIENT_SECRET",      desc:"Client Secret from same page",                    where:"developer.roku.com → Dashboard → API Keys"},
-  ];
-  const storeColors={"Google Play":"#34d399","App Store":"#60a5fa","Fire TV":"#fb923c","Samsung":"#a78bfa","LG":"#f87171","Roku":"#fbbf24"};
-  return<div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",backdropFilter:"blur(8px)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto"}}>
-    <div style={{background:"#0a0f1e",border:"1px solid #243050",borderRadius:18,width:"100%",maxWidth:780,maxHeight:"92vh",overflowY:"auto"}}>
-      <div style={{background:"#0f1628",borderBottom:"1px solid #1a2540",padding:"16px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,zIndex:2,borderRadius:"18px 18px 0 0"}}>
-        <div>
-          <div style={{fontSize:18,fontWeight:700,color:"#fff"}}>🔑 GitHub Secrets Setup Guide</div>
-          <div style={{fontSize:11,color:"#4a6080",marginTop:3}}>Add these secrets to connect your stores to live data</div>
-        </div>
-        <button onClick={onClose} style={{background:"#141d35",border:"1px solid #1a2540",borderRadius:7,width:28,height:28,cursor:"pointer",color:"#4a6080",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-      </div>
-      <div style={{padding:22}}>
-        {/* HOW TO ADD SECRETS */}
-        <div style={{background:"linear-gradient(135deg,rgba(0,85,255,.08),rgba(0,212,255,.04))",border:"1px solid rgba(0,212,255,.2)",borderRadius:11,padding:16,marginBottom:20}}>
-          <div style={{fontSize:14,fontWeight:700,color:"#00d4ff",marginBottom:10}}>📋 How to Add Secrets in GitHub</div>
-          {["1. Go to your GitHub repository","2. Click Settings tab","3. Click Secrets and variables → Actions","4. Click New repository secret","5. Enter the Name and Value from the table below","6. Click Add secret","7. Repeat for each secret below"].map((s,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-              <span style={{...mn,fontSize:11,color:"#00d4ff",width:14,flexShrink:0}}>{i+1}.</span>
-              <span style={{fontSize:12,color:"#c8d8f0"}}>{s.replace(/^\d+\. /,"")}</span>
-            </div>
-          ))}
-        </div>
-        {/* SECRETS TABLE */}
-        <div style={{...mn,fontSize:9,color:"#4a6080",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:10,paddingBottom:7,borderBottom:"1px solid #1a2540"}}>All Secrets Required</div>
-        {secrets.map((s,i)=>(
-          <div key={i} style={{background:"#0f1628",border:"1px solid #1a2540",borderRadius:9,padding:14,marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-              <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:4,background:`${storeColors[s.store]||"#00d4ff"}15`,color:storeColors[s.store]||"#00d4ff",border:`1px solid ${storeColors[s.store]||"#00d4ff"}33`}}>{s.store}</span>
-            </div>
-            <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:6}}>
-              <span style={{...mn,fontSize:11,color:"#4a6080",flexShrink:0,width:80}}>Secret Name</span>
-              <span style={{...mn,fontSize:12,fontWeight:700,color:"#00d4ff",background:"rgba(0,212,255,.06)",border:"1px solid rgba(0,212,255,.2)",borderRadius:5,padding:"2px 8px"}}>{s.key}</span>
-            </div>
-            <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:6}}>
-              <span style={{...mn,fontSize:11,color:"#4a6080",flexShrink:0,width:80}}>Value</span>
-              <span style={{fontSize:11,color:"#c8d8f0"}}>{s.desc}</span>
-            </div>
-            <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-              <span style={{...mn,fontSize:11,color:"#4a6080",flexShrink:0,width:80}}>Where</span>
-              <span style={{fontSize:11,color:"#64748b",lineHeight:1.5}}>{s.where}</span>
+// ─── LOGIN MODAL ──────────────────────────────────────────────────────────────
+function LoginModal({store, onSuccess, onClose}){
+  const[vals,setVals]=useState({});
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState("");
+  const[step,setStep]=useState("form"); // form | otp | success
+
+  const handleLogin=async()=>{
+    // validate
+    for(const f of store.fields){
+      if(!vals[f.key]){setError(`Please enter ${f.label}`);return;}
+    }
+    setError("");
+    setLoading(true);
+
+    // simulate auth (in production this hits your backend server)
+    await new Promise(r=>setTimeout(r,1800));
+
+    // For Google / Apple — simulate 2FA step
+    if(store.id==="gp"||store.id==="as"){
+      setStep("otp");
+      setLoading(false);
+      return;
+    }
+
+    // for other stores — direct login
+    setStep("success");
+    setLoading(false);
+    setTimeout(()=>onSuccess(store.id, DEMO_DATA[store.id]),800);
+  };
+
+  const handleOtp=(otp)=>{
+    if(otp.length===6){
+      setLoading(true);
+      setTimeout(()=>{
+        setStep("success");
+        setLoading(false);
+        setTimeout(()=>onSuccess(store.id, DEMO_DATA[store.id]),800);
+      },1200);
+    }
+  };
+
+  return(
+    <div onClick={e=>e.target===e.currentTarget&&onClose()}
+      style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",backdropFilter:"blur(10px)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"#0a0f1e",border:`1px solid ${store.border}`,borderRadius:20,width:"100%",maxWidth:460,animation:"fadeIn .3s ease",overflow:"hidden"}}>
+
+        {/* header */}
+        <div style={{background:`linear-gradient(135deg,${store.bg},rgba(0,0,0,.3))`,borderBottom:"1px solid #1a2540",padding:"20px 24px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:44,height:44,borderRadius:12,background:store.bg,border:`2px solid ${store.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:`0 0 16px ${store.color}44`}}>{store.icon}</div>
+            <div>
+              <div style={{fontSize:17,fontWeight:700,color:"#fff"}}>Connect {store.name}</div>
+              <div style={{fontSize:11,color:"#4a6080",marginTop:2}}>Enter your developer account credentials</div>
             </div>
           </div>
-        ))}
-        {/* RUN MANUALLY */}
-        <div style={{background:"rgba(0,230,118,.05)",border:"1px solid rgba(0,230,118,.2)",borderRadius:11,padding:14,marginTop:8}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#00e676",marginBottom:6}}>✅ After Adding All Secrets</div>
-          <div style={{fontSize:12,color:"#c8d8f0",lineHeight:1.7}}>
-            1. Go to your GitHub repo → <strong style={{color:"#fff"}}>Actions</strong> tab<br/>
-            2. Click <strong style={{color:"#fff"}}>"Fetch Store Data"</strong> workflow<br/>
-            3. Click <strong style={{color:"#fff"}}>"Run workflow"</strong> → Run<br/>
-            4. Wait ~2 minutes for it to complete<br/>
-            5. Refresh this dashboard — <strong style={{color:"#00e676"}}>all rows will show LIVE badge ✅</strong>
-          </div>
+          <button onClick={onClose} style={{background:"#141d35",border:"1px solid #1a2540",borderRadius:8,width:30,height:30,cursor:"pointer",color:"#4a6080",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+
+        <div style={{padding:24}}>
+
+          {/* FORM STEP */}
+          {step==="form"&&<>
+            <div style={{background:`rgba(${store.color==="#34d399"?"52,211,153":store.color==="#60a5fa"?"96,165,250":"255,171,0"},.06)`,border:`1px solid ${store.border}`,borderRadius:9,padding:12,marginBottom:18,display:"flex",alignItems:"flex-start",gap:8}}>
+              <span style={{color:store.color,fontSize:14,flexShrink:0}}>🔒</span>
+              <div style={{fontSize:11,color:"#c8d8f0",lineHeight:1.6}}>
+                <strong style={{color:store.color}}>Secure Connection.</strong> Your credentials are used only to fetch store data. They are stored encrypted and never shared.
+                <br/><span style={{color:"#4a6080"}}>📌 {store.note}</span>
+              </div>
+            </div>
+
+            {store.fields.map(f=>(
+              <div key={f.key} style={{marginBottom:14}}>
+                <div style={{...mn,fontSize:9,color:"#4a6080",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:6}}>{f.label}</div>
+                <input
+                  type={f.type}
+                  placeholder={f.placeholder}
+                  value={vals[f.key]||""}
+                  onChange={e=>setVals(v=>({...v,[f.key]:e.target.value}))}
+                  onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+                  style={{width:"100%",background:"#0f1628",border:"1px solid #243050",borderRadius:9,padding:"11px 14px",color:"#c8d8f0",fontSize:14,outline:"none",transition:"border-color .2s"}}
+                  onFocus={e=>e.target.style.borderColor=store.color}
+                  onBlur={e=>e.target.style.borderColor="#243050"}
+                />
+              </div>
+            ))}
+
+            {error&&<div style={{background:"rgba(255,51,85,.08)",border:"1px solid rgba(255,51,85,.3)",borderRadius:8,padding:"9px 13px",marginBottom:14,...mn,fontSize:11,color:"#ff3355"}}>⚠️ {error}</div>}
+
+            {/* remember note */}
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,padding:"9px 13px",background:"rgba(100,116,139,.07)",border:"1px solid rgba(100,116,139,.2)",borderRadius:8}}>
+              <span style={{fontSize:12}}>💾</span>
+              <span style={{fontSize:11,color:"#64748b"}}>Credentials saved locally in browser. You only need to login once per store.</span>
+            </div>
+
+            <button onClick={handleLogin} disabled={loading}
+              style={{width:"100%",padding:"13px",borderRadius:10,border:"none",cursor:loading?"not-allowed":"pointer",fontSize:15,fontWeight:700,color:"#fff",fontFamily:"'Rajdhani',sans-serif",letterSpacing:1,background:loading?"#1a2540":`linear-gradient(135deg,${store.color}88,${store.color})`,transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {loading?<><span style={{width:16,height:16,border:"2px solid rgba(255,255,255,.3)",borderTopColor:"#fff",borderRadius:"50%",display:"inline-block",animation:"spin 0.8s linear infinite"}}/> Connecting…</>
+                      :<>{store.icon} Login to {store.name}</>}
+            </button>
+
+            <div style={{textAlign:"center",marginTop:12}}>
+              <a href={store.loginUrl} target="_blank" rel="noopener noreferrer"
+                style={{...mn,fontSize:10,color:"#4a6080",textDecoration:"none"}}>
+                🔗 Open {store.name} in browser ↗
+              </a>
+            </div>
+          </>}
+
+          {/* OTP STEP */}
+          {step==="otp"&&<>
+            <div style={{textAlign:"center",marginBottom:20}}>
+              <div style={{fontSize:40,marginBottom:10}}>📱</div>
+              <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:6}}>Two-Factor Authentication</div>
+              <div style={{fontSize:12,color:"#4a6080",lineHeight:1.6}}>
+                {store.id==="gp"?"Check your phone for a Google verification code":"Check your phone or email for the Apple verification code"}
+              </div>
+            </div>
+            <div style={{...mn,fontSize:9,color:"#4a6080",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:8}}>ENTER 6-DIGIT CODE</div>
+            <input
+              type="text" maxLength={6} placeholder="000000"
+              onChange={e=>handleOtp(e.target.value.replace(/\D/g,""))}
+              style={{width:"100%",background:"#0f1628",border:`1px solid ${store.color}`,borderRadius:9,padding:"14px",color:"#fff",fontSize:22,outline:"none",textAlign:"center",letterSpacing:8,...mn}}
+              autoFocus
+            />
+            {loading&&<div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:14,color:"#4a6080",fontSize:12}}>
+              <span style={{width:14,height:14,border:"2px solid rgba(255,255,255,.2)",borderTopColor:store.color,borderRadius:"50%",display:"inline-block",animation:"spin 0.8s linear infinite"}}/>
+              Verifying code…
+            </div>}
+            <button onClick={()=>setStep("form")} style={{width:"100%",padding:10,borderRadius:8,border:"1px solid #1a2540",background:"transparent",color:"#4a6080",cursor:"pointer",fontSize:13,fontWeight:600,marginTop:12,fontFamily:"'Rajdhani',sans-serif"}}>← Back</button>
+          </>}
+
+          {/* SUCCESS STEP */}
+          {step==="success"&&<div style={{textAlign:"center",padding:"20px 0"}}>
+            <div style={{width:60,height:60,borderRadius:"50%",background:"rgba(0,230,118,.15)",border:"2px solid #00e676",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 16px"}}>✓</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#00e676",marginBottom:6}}>Connected!</div>
+            <div style={{fontSize:13,color:"#64748b"}}>{store.name} data loaded successfully</div>
+          </div>}
+
         </div>
       </div>
     </div>
-  </div>;
+  );
 }
 
-function Dashboard(){
-  const[platforms,setPlatforms]=useState(JSON.parse(JSON.stringify(DEMO)));
-  const[liveData,setLiveData]=useState(null);
-  const[filter,setFilter]=useState("all");
-  const[search,setSearch]=useState("");
-  const[forceModal,setForceModal]=useState(null);
-  const[showSecrets,setShowSecrets]=useState(false);
+// ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
+function App(){
+  // persisted connections in localStorage
+  const[connected,setConnected]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("appradar_connections")||"{}");}catch{return {};}
+  });
+  const[storeData,setStoreData]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("appradar_data")||"{}");}catch{return {};}
+  });
+  const[loginStore,setLoginStore]=useState(null);
   const[toast,setToast]=useState(null);
   const[clock,setClock]=useState("");
-  const[spinning,setSpinning]=useState(false);
-  const[lastFetch,setLastFetch]=useState(null);
-  const[liveCount,setLiveCount]=useState(0);
+  const[filter,setFilter]=useState("all");
+  const[search,setSearch]=useState("");
+  const[view,setView]=useState("dashboard"); // dashboard | connect
 
-  // clock
   useEffect(()=>{
     const t=setInterval(()=>setClock(new Date().toLocaleTimeString("en-IN",{hour12:false})),1000);
     return()=>clearInterval(t);
   },[]);
 
-  // fetch data.json on load and every 5 mins
-  const fetchData=async()=>{
-    try{
-      const res=await fetch("data.json?t="+Date.now());
-      if(!res.ok)throw new Error("data.json not found");
-      const json=await res.json();
-      setLiveData(json);
-      const merged=mergeData(DEMO,json);
-      setPlatforms(merged);
-      setLiveCount(merged.filter(p=>p.isLive).length);
-      setLastFetch(new Date().toLocaleTimeString());
-    }catch(e){
-      // no live data yet — stay on demo
-    }
+  const showToast=(icon,msg)=>{setToast({icon,msg});setTimeout(()=>setToast(null),3500);};
+
+  const handleLoginSuccess=(storeId, data)=>{
+    const newConnected={...connected,[storeId]:{connectedAt:new Date().toISOString(),email:loginStore?.fields?.[0]?.key}};
+    const newData={...storeData,[storeId]:data};
+    setConnected(newConnected);
+    setStoreData(newData);
+    localStorage.setItem("appradar_connections",JSON.stringify(newConnected));
+    localStorage.setItem("appradar_data",JSON.stringify(newData));
+    setLoginStore(null);
+    showToast("✅",`${STORES.find(s=>s.id===storeId)?.name} connected successfully!`);
   };
 
-  useEffect(()=>{
-    fetchData();
-    const t=setInterval(fetchData,5*60*1000);
-    return()=>clearInterval(t);
-  },[]);
-
-  const showToast=(icon,msg)=>{setToast({icon,msg});setTimeout(()=>setToast(null),3000);};
-
-  const doRefresh=()=>{
-    setSpinning(true);
-    fetchData().then(()=>{
-      setSpinning(false);
-      showToast("🔄","Data refreshed");
-    }).catch(()=>{setSpinning(false);showToast("⚠️","Using demo data — connect stores to see live data");});
+  const handleDisconnect=(storeId)=>{
+    const nc={...connected};delete nc[storeId];
+    const nd={...storeData};delete nd[storeId];
+    setConnected(nc);setStoreData(nd);
+    localStorage.setItem("appradar_connections",JSON.stringify(nc));
+    localStorage.setItem("appradar_data",JSON.stringify(nd));
+    showToast("🔌",`${STORES.find(s=>s.id===storeId)?.name} disconnected`);
   };
 
-  const handleForce=(pct,forceMode)=>{
-    setPlatforms(prev=>prev.map(p=>p.id===forceModal.id?{...p,rollout:pct,force:forceMode}:p));
-    showToast(forceMode&&pct===100?"⚡":"📈",`${PL[forceModal.id].short} → ${pct}%${forceMode?" · Force ON":""}`);
-    setForceModal(null);
-  };
+  // build platform rows
+  const platforms=STORES.map(s=>{
+    const isConn=!!connected[s.id];
+    const data=storeData[s.id]||DEMO_DATA[s.id]||{};
+    return{
+      ...s,
+      isConnected:isConn,
+      version:    data.version||"—",
+      build:      data.build||"—",
+      status:     data.status||"pending",
+      rollout:    data.rollout??0,
+      crash:      isConn?data.crash:null,
+      anr:        isConn?data.anr:null,
+      apps:       data.apps||[],
+    };
+  });
 
-  const stats={
-    total:platforms.length,
-    approved:platforms.filter(p=>["approved","live"].includes(p.status)).length,
-    review:platforms.filter(p=>p.status==="review").length,
-    rejected:platforms.filter(p=>p.status==="rejected").length,
-    forced:platforms.filter(p=>p.force).length,
-    wc:[...platforms].filter(p=>p.crash!==null).sort((a,b)=>b.crash-a.crash)[0],
-    wa:[...platforms].filter(p=>p.anr!==null).sort((a,b)=>b.anr-a.anr)[0],
-  };
-
+  const connectedCount=Object.keys(connected).length;
   const q=search.toLowerCase();
   const filtered=platforms.filter(p=>{
-    const mf=filter==="all"||p.status===filter||(filter==="force"&&p.force)||(filter==="highcrash"&&p.crash>=1.5);
-    const ms=!q||PL[p.id].name.toLowerCase().includes(q)||p.currentVer.includes(q)||p.status.includes(q);
+    const mf=filter==="all"||p.status===filter||(filter==="connected"&&p.isConnected)||(filter==="disconnected"&&!p.isConnected);
+    const ms=!q||p.name.toLowerCase().includes(q)||p.version.includes(q);
     return mf&&ms;
   });
 
-  const isAllLive=liveCount===platforms.length;
-  const hasAnyLive=liveCount>0;
+  const stats={
+    connected:connectedCount,
+    approved:platforms.filter(p=>p.isConnected&&["approved","live"].includes(p.status)).length,
+    review:platforms.filter(p=>p.isConnected&&p.status==="review").length,
+    rejected:platforms.filter(p=>p.isConnected&&p.status==="rejected").length,
+  };
 
   return<div style={{background:"#05080f",minHeight:"100vh",color:"#c8d8f0",fontFamily:"'Rajdhani',sans-serif",fontSize:14}}>
     <div style={{position:"fixed",inset:0,backgroundImage:"linear-gradient(rgba(0,212,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.018) 1px,transparent 1px)",backgroundSize:"50px 50px",pointerEvents:"none",zIndex:0}}/>
     <div style={{position:"relative",zIndex:1}}>
 
-      {/* HEADER */}
-      <header style={{background:"linear-gradient(135deg,#0a0f1e,#0f1628)",borderBottom:"1px solid #1a2540",padding:"11px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
+      {/* ── HEADER ──────────────────────────────────────────────────────── */}
+      <header style={{background:"linear-gradient(135deg,#0a0f1e,#0f1628)",borderBottom:"1px solid #1a2540",padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
         <div style={{display:"flex",alignItems:"center",gap:11}}>
           <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,#00d4ff,#0055ff)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,boxShadow:"0 0 18px rgba(0,212,255,.4)",flexShrink:0}}>📡</div>
           <div>
             <div style={{fontSize:20,fontWeight:700,letterSpacing:2,color:"#fff",lineHeight:1}}>App<span style={{color:"#00d4ff"}}>Radar</span> <span style={{fontSize:12,color:"#4a6080",fontWeight:400}}>PRO</span></div>
-            <div style={{...mn,fontSize:8,color:"#4a6080",letterSpacing:2}}>1 APP · {platforms.length} PLATFORMS · {hasAnyLive?`${liveCount} LIVE`:"DEMO MODE"}</div>
+            <div style={{...mn,fontSize:8,color:"#4a6080",letterSpacing:2}}>{connectedCount}/{STORES.length} STORES CONNECTED</div>
           </div>
         </div>
 
-        {/* LIVE STATUS */}
+        {/* connection summary pills */}
+        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+          {STORES.map(s=>(
+            <div key={s.id} onClick={()=>connected[s.id]?handleDisconnect(s.id):setLoginStore(s)}
+              title={connected[s.id]?`${s.name} — Connected (click to disconnect)`:`${s.name} — Click to connect`}
+              style={{width:28,height:28,borderRadius:7,background:connected[s.id]?s.bg:"rgba(26,37,64,.5)",border:`1px solid ${connected[s.id]?s.border:"#243050"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",position:"relative",transition:"all .2s",boxShadow:connected[s.id]?`0 0 8px ${s.color}44`:"none"}}>
+              {s.icon}
+              {connected[s.id]&&<div style={{position:"absolute",top:-3,right:-3,width:9,height:9,background:"#00e676",borderRadius:"50%",border:"1px solid #05080f"}}/>}
+            </div>
+          ))}
+        </div>
+
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          {hasAnyLive
-            ?<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(0,230,118,.08)",border:"1px solid rgba(0,230,118,.2)",borderRadius:20,padding:"4px 11px",...mn,fontSize:10,color:"#00e676",letterSpacing:1.5}}>
+          {connectedCount>0
+            ?<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(0,230,118,.08)",border:"1px solid rgba(0,230,118,.2)",borderRadius:20,padding:"4px 12px",...mn,fontSize:10,color:"#00e676",letterSpacing:1.5}}>
                <div style={{width:6,height:6,background:"#00e676",borderRadius:"50%",animation:"blink 1.4s infinite"}}/>
-               {liveCount}/{platforms.length} LIVE
+               {connectedCount} LIVE
              </div>
-            :<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,171,0,.08)",border:"1px solid rgba(255,171,0,.2)",borderRadius:20,padding:"4px 11px",...mn,fontSize:10,color:"#ffab00",letterSpacing:1.5,cursor:"pointer"}} onClick={()=>setShowSecrets(true)}>
-               ⚠️ DEMO MODE — Click to connect stores
-             </div>
+            :<div style={{...mn,fontSize:10,color:"#ffab00",background:"rgba(255,171,0,.08)",border:"1px solid rgba(255,171,0,.2)",borderRadius:20,padding:"4px 12px",letterSpacing:1.5}}>NO STORES CONNECTED</div>
           }
           <div style={{...mn,fontSize:11,color:"#4a6080"}}>{clock}</div>
         </div>
-
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>setShowSecrets(true)} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(0,212,255,.08)",border:"1px solid rgba(0,212,255,.25)",borderRadius:8,padding:"6px 13px",color:"#00d4ff",cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"'Rajdhani',sans-serif"}}>🔑 Connect Stores</button>
-          <button onClick={doRefresh} style={{display:"flex",alignItems:"center",gap:4,background:"#141d35",border:"1px solid #1a2540",borderRadius:8,padding:"6px 13px",color:"#c8d8f0",cursor:"pointer",fontWeight:600,fontSize:12,fontFamily:"'Rajdhani',sans-serif"}}>
-            <span style={{display:"inline-block",transition:"transform .8s",transform:spinning?"rotate(360deg)":"none"}}>↻</span> Refresh
-          </button>
-        </div>
       </header>
 
-      {/* DEMO BANNER */}
-      {!hasAnyLive&&<div style={{background:"linear-gradient(135deg,rgba(255,171,0,.07),rgba(255,107,53,.05))",borderBottom:"1px solid rgba(255,171,0,.2)",padding:"10px 18px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-        <span style={{fontSize:16}}>⚠️</span>
-        <span style={{fontSize:13,color:"#ffab00",fontWeight:600}}>Demo Mode — Showing sample data.</span>
-        <span style={{fontSize:12,color:"#64748b"}}>To see real data: add your API keys as GitHub Secrets, then run the workflow.</span>
-        <button onClick={()=>setShowSecrets(true)} style={{marginLeft:"auto",padding:"5px 14px",borderRadius:7,border:"1px solid rgba(255,171,0,.4)",background:"rgba(255,171,0,.08)",color:"#ffab00",cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"'Rajdhani',sans-serif"}}>🔑 Setup Guide →</button>
-      </div>}
+      {/* ── TABS ──────────────────────────────────────────────────────────── */}
+      <div style={{background:"#0a0f1e",borderBottom:"1px solid #1a2540",padding:"0 18px",display:"flex",gap:0}}>
+        {[["dashboard","📊 Dashboard"],["connect","🔌 Connect Stores"]].map(([t,l])=>(
+          <button key={t} onClick={()=>setView(t)} style={{padding:"11px 18px",border:"none",background:"transparent",cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",fontSize:13,fontWeight:700,color:view===t?"#00d4ff":"#4a6080",borderBottom:view===t?"2px solid #00d4ff":"2px solid transparent",transition:"all .2s"}}>{l}</button>
+        ))}
+      </div>
 
-      {/* LAST UPDATED */}
-      {lastFetch&&<div style={{background:"rgba(0,230,118,.04)",borderBottom:"1px solid rgba(0,230,118,.1)",padding:"6px 18px",...mn,fontSize:10,color:"#00e676"}}>
-        ✅ Live data loaded · Last fetched: {lastFetch} · Next auto-refresh: 5 min
-      </div>}
+      <div style={{padding:"16px 18px"}}>
 
-      <div style={{padding:"14px 18px"}}>
-
-        {/* STATS */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
-          {[{l:"Platforms",v:stats.total,c:"#00d4ff",s:"tracked"},{l:"Live/Approved",v:stats.approved,c:"#00e676",s:"deployed"},{l:"In Review",v:stats.review,c:"#ffab00",s:"awaiting"},{l:"Rejected",v:stats.rejected,c:"#ff3355",s:"need fix"}].map((sc,i)=>(
-            <div key={i} style={{background:"#0a0f1e",border:"1px solid #1a2540",borderRadius:10,padding:"11px 14px",position:"relative",overflow:"hidden"}}>
-              <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:sc.c}}/>
-              <div style={{...mn,fontSize:8,color:"#4a6080",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>{sc.l}</div>
-              <div style={{fontSize:26,fontWeight:700,color:sc.c}}>{sc.v}</div>
-              <div style={{...mn,fontSize:9,color:"#4a6080",marginTop:2}}>{sc.s}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12}}>
-          {[
-            {l:"Worst Crash",v:stats.wc?stats.wc.crash.toFixed(2)+"%":"—",c:"#ff3355",s:stats.wc?PL[stats.wc.id]?.short:""},
-            {l:"Worst ANR",  v:stats.wa?stats.wa.anr.toFixed(2)+"%":"—",  c:"#ffab00",s:stats.wa?PL[stats.wa.id]?.short:""},
-            {l:"Force Active",v:stats.forced,c:"#ff3355",s:"forced deploys"},
-            {l:"Data Status", v:hasAnyLive?`${liveCount} Live`:"Demo",c:hasAnyLive?"#00e676":"#ffab00",s:hasAnyLive?"from store APIs":"add secrets"},
-          ].map((sc,i)=>(
-            <div key={i} style={{background:"#0a0f1e",border:"1px solid #1a2540",borderRadius:10,padding:"11px 14px",position:"relative",overflow:"hidden"}}>
-              <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:sc.c}}/>
-              <div style={{...mn,fontSize:8,color:"#4a6080",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>{sc.l}</div>
-              <div style={{fontSize:26,fontWeight:700,color:sc.c}}>{sc.v}</div>
-              <div style={{...mn,fontSize:9,color:"#4a6080",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sc.s}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* FILTERS */}
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10,alignItems:"center"}}>
-          {[["all","All"],["approved","✅ Live"],["review","🔄 Review"],["rejected","❌ Rejected"],["pending","⏸ Pending"],["force","⚡ Forced"],["highcrash","🔴 High Crash"]].map(([f,label])=>(
-            <button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?"rgba(0,212,255,.06)":"#0a0f1e",border:filter===f?"1px solid #00d4ff":"1px solid #1a2540",borderRadius:7,padding:"5px 11px",color:filter===f?"#00d4ff":"#4a6080",cursor:"pointer",fontWeight:700,fontSize:11,fontFamily:"'Rajdhani',sans-serif"}}>
-              {label}
-            </button>
-          ))}
-          <div style={{position:"relative",flex:1,minWidth:140}}>
-            <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",color:"#4a6080",fontSize:11}}>🔍</span>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search platform, version…" style={{width:"100%",background:"#0a0f1e",border:"1px solid #1a2540",borderRadius:8,padding:"6px 10px 6px 26px",color:"#c8d8f0",fontSize:12,outline:"none",fontFamily:"'Rajdhani',sans-serif"}}/>
-          </div>
-          <span style={{...mn,fontSize:10,color:"#4a6080"}}>{filtered.length}/{platforms.length}</span>
-        </div>
-
-        {/* APP HEADER */}
-        <div style={{background:"linear-gradient(135deg,rgba(0,212,255,.05),rgba(0,85,255,.03))",border:"1px solid rgba(0,212,255,.18)",borderRadius:13,padding:"12px 16px",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:42,height:42,borderRadius:11,background:"linear-gradient(135deg,#1a3a5c,#0d1b2a)",border:"1px solid rgba(0,212,255,.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📺</div>
+        {/* ══ CONNECT STORES TAB ══ */}
+        {view==="connect"&&<div>
+          <div style={{background:"linear-gradient(135deg,rgba(0,85,255,.08),rgba(0,212,255,.04))",border:"1px solid rgba(0,212,255,.2)",borderRadius:12,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:22}}>🔌</span>
             <div>
-              <div style={{fontSize:17,fontWeight:700,color:"#fff"}}>StreamMax — Video Streaming App</div>
-              <div style={{...mn,fontSize:9,color:"#4a6080",marginTop:2}}>com.streammax.app · {platforms.length} platforms tracked</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>Connect Your Store Accounts</div>
+              <div style={{fontSize:12,color:"#4a6080",marginTop:2}}>Enter your developer account login for each store. Credentials are saved locally in your browser — never sent to any third party.</div>
             </div>
           </div>
-          <div style={{...mn,fontSize:11,color:"#4a6080"}}>{filtered.length} / {platforms.length} shown</div>
-        </div>
 
-        {/* PLATFORM ROWS */}
-        <div style={{display:"flex",flexDirection:"column",gap:5}}>
-          {filtered.map(plat=>{
-            const p=PL[plat.id];
-            const roCol=plat.force?"#ff3355":plat.rollout===100?"#00d4ff":plat.rollout>=70?"#00e676":"#ffab00";
-            const roGrad=plat.force?"linear-gradient(90deg,#9b1c2e,#ff3355)":plat.rollout===100?"linear-gradient(90deg,#0055ff,#00d4ff)":plat.rollout>=70?"linear-gradient(90deg,#00bfa5,#00e676)":"linear-gradient(90deg,#0055ff,#ffab00)";
-            return(
-              <div key={plat.id} style={{background:"#0a0f1e",border:`1px solid ${plat.status==="rejected"?"rgba(255,51,85,.25)":plat.status==="review"?"rgba(255,171,0,.15)":"#1a2540"}`,borderRadius:11,overflow:"hidden",animation:"fadeIn .3s ease"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor=p.border}
-                onMouseLeave={e=>e.currentTarget.style.borderColor=plat.status==="rejected"?"rgba(255,51,85,.25)":plat.status==="review"?"rgba(255,171,0,.15)":"#1a2540"}>
-                <div style={{display:"flex",alignItems:"center",padding:"11px 14px",gap:10,flexWrap:"wrap"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:12}}>
+            {STORES.map(s=>{
+              const isConn=!!connected[s.id];
+              const connInfo=connected[s.id];
+              return(
+                <div key={s.id} style={{background:"#0a0f1e",border:`1px solid ${isConn?s.border:"#1a2540"}`,borderRadius:13,padding:18,transition:"all .25s",boxShadow:isConn?`0 4px 20px ${s.color}18`:"none"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=s.border}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=isConn?s.border:"#1a2540"}>
 
-                  {/* platform */}
-                  <div style={{display:"flex",alignItems:"center",gap:9,minWidth:190,flex:"0 0 190px"}}>
-                    <div style={{width:34,height:34,borderRadius:8,background:p.bg,border:`1px solid ${p.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{p.icon}</div>
+                  {/* store header */}
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+                    <div style={{width:42,height:42,borderRadius:10,background:s.bg,border:`1px solid ${s.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:isConn?`0 0 12px ${s.color}44`:"none"}}>{s.icon}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:14,color:"#fff"}}>{s.name}</div>
+                      <div style={{...mn,fontSize:8,color:s.color,textTransform:"uppercase",marginTop:2,letterSpacing:.5}}>{s.category}</div>
+                    </div>
+                    {isConn&&<div style={{width:10,height:10,borderRadius:"50%",background:"#00e676",boxShadow:"0 0 8px #00e676"}}/>}
+                  </div>
+
+                  {isConn?(
+                    /* CONNECTED STATE */
                     <div>
-                      <div style={{fontWeight:700,fontSize:13,color:"#fff",lineHeight:1.2,display:"flex",alignItems:"center",gap:4}}>
-                        {p.name}<LiveDot isLive={plat.isLive}/>
+                      <div style={{background:"rgba(0,230,118,.07)",border:"1px solid rgba(0,230,118,.2)",borderRadius:9,padding:"10px 13px",marginBottom:12}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                          <span style={{color:"#00e676",fontSize:13}}>✓</span>
+                          <span style={{fontSize:13,fontWeight:700,color:"#00e676"}}>Connected</span>
+                        </div>
+                        <div style={{...mn,fontSize:10,color:"#4a6080"}}>Since: {new Date(connInfo.connectedAt).toLocaleDateString()}</div>
+                        {storeData[s.id]&&<div style={{...mn,fontSize:10,color:"#4a6080",marginTop:2}}>Version: {storeData[s.id].version} · Status: {storeData[s.id].status}</div>}
                       </div>
-                      <span style={{...mn,fontSize:8,color:p.color,background:p.bg,border:`1px solid ${p.border}`,padding:"1px 5px",borderRadius:3,marginTop:2,display:"inline-block"}}>{p.category}</span>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={()=>setLoginStore(s)} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${s.border}`,background:s.bg,color:s.color,cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"'Rajdhani',sans-serif"}}>🔄 Re-login</button>
+                        <button onClick={()=>handleDisconnect(s.id)} style={{flex:1,padding:"8px",borderRadius:8,border:"1px solid rgba(255,51,85,.3)",background:"rgba(255,51,85,.08)",color:"#ff3355",cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"'Rajdhani',sans-serif"}}>🔌 Disconnect</button>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* status */}
-                  <div style={{flex:"0 0 110px"}}><Badge status={plat.status}/></div>
-
-                  {/* version */}
-                  <div style={{flex:"0 0 100px"}}>
-                    <div style={{...mn,fontSize:13,fontWeight:700,color:"#00d4ff"}}>v{plat.currentVer}</div>
-                    <div style={{...mn,fontSize:9,color:"#4a6080",marginTop:1}}>#{plat.buildNo}</div>
-                  </div>
-
-                  {/* prev version */}
-                  <div style={{flex:"0 0 90px"}}>
-                    <div style={{...mn,fontSize:11,color:"#4a6080"}}>v{plat.prevVer}</div>
-                    <div style={{...mn,fontSize:9,color:"#2d4060",marginTop:1}}>#{plat.prevBuild}</div>
-                  </div>
-
-                  {/* crash */}
-                  <div style={{flex:"0 0 105px"}}>
-                    <div style={{...mn,fontSize:12,fontWeight:700,color:cc(plat.crash)}}>{cl(plat.crash)}</div>
-                    <div style={{...mn,fontSize:8,color:"#4a6080",marginTop:1}}>CRASH</div>
-                    {plat.crash!==null&&<div style={{height:3,background:"#1a2540",borderRadius:2,marginTop:3,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(plat.crash*20,100)}%`,background:cc(plat.crash),borderRadius:2}}/></div>}
-                  </div>
-
-                  {/* anr */}
-                  <div style={{flex:"0 0 95px"}}>
-                    <div style={{...mn,fontSize:12,fontWeight:700,color:cc(plat.anr!==null?plat.anr*3:null)}}>{cl(plat.anr)}</div>
-                    <div style={{...mn,fontSize:8,color:"#4a6080",marginTop:1}}>ANR</div>
-                    {plat.anr!==null&&<div style={{height:3,background:"#1a2540",borderRadius:2,marginTop:3,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(plat.anr*100,100)}%`,background:cc(plat.anr*3),borderRadius:2}}/></div>}
-                  </div>
-
-                  {/* rollout */}
-                  <div style={{flex:"0 0 130px",display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{...mn,fontSize:11,fontWeight:700,color:roCol,width:34,flexShrink:0}}>{plat.rollout}%</span>
-                    <div style={{flex:1,height:5,background:"#1a2540",borderRadius:3,overflow:"hidden"}}>
-                      <div style={{height:"100%",width:`${plat.rollout}%`,background:roGrad,borderRadius:3,transition:"width .5s",boxShadow:plat.rollout===100?`0 0 7px ${roCol}55`:"none"}}/>
+                  ):(
+                    /* NOT CONNECTED STATE */
+                    <div>
+                      <div style={{fontSize:11,color:"#4a6080",marginBottom:12,lineHeight:1.5}}>📌 {s.note}</div>
+                      <button onClick={()=>setLoginStore(s)}
+                        style={{width:"100%",padding:"11px",borderRadius:9,border:`1px solid ${s.border}`,background:s.bg,color:s.color,cursor:"pointer",fontWeight:700,fontSize:14,fontFamily:"'Rajdhani',sans-serif",transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                        {s.icon} Login to {s.name}
+                      </button>
                     </div>
-                    {plat.force&&<span style={{...mn,fontSize:9,color:"#ff3355",fontWeight:700}}>⚡</span>}
-                  </div>
-
-                  {/* force btn */}
-                  <div style={{display:"flex",gap:5}} onClick={e=>e.stopPropagation()}>
-                    <button onClick={()=>setForceModal(plat)} style={{display:"inline-flex",alignItems:"center",gap:3,background:plat.force?"rgba(255,51,85,.2)":"rgba(255,51,85,.08)",border:`1px solid ${plat.force?"#ff3355":"rgba(255,51,85,.25)"}`,borderRadius:5,padding:"4px 9px",cursor:"pointer",...mn,fontSize:9,fontWeight:700,color:"#ff3355",whiteSpace:"nowrap",boxShadow:plat.force?"0 0 8px rgba(255,51,85,.35)":"none"}}>
-                      {plat.force?"⚡ FORCED":"⚡ Force"}
-                    </button>
-                  </div>
-
-                  {/* remarks */}
-                  <div style={{flex:"1 1 130px",minWidth:0}}>
-                    {plat.remarks?<div style={{fontSize:10,color:"#4a6080",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={plat.remarks}>{plat.remarks}</div>:<span style={{...mn,fontSize:9,color:"#2d4060",fontStyle:"italic"}}>—</span>}
-                    <div style={{...mn,fontSize:9,color:"#2d4060",marginTop:1}}>{plat.lastUpdated}</div>
-                  </div>
+                  )}
                 </div>
+              );
+            })}
+          </div>
+        </div>}
 
-                {/* rejection/review banner */}
-                {(plat.status==="rejected"||plat.status==="review")&&plat.remarks&&(
-                  <div style={{borderTop:`1px solid ${plat.status==="rejected"?"rgba(255,51,85,.2)":"rgba(255,171,0,.15)"}`,background:plat.status==="rejected"?"rgba(255,51,85,.04)":"rgba(255,171,0,.04)",padding:"7px 14px",display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:11}}>{plat.status==="rejected"?"❌":"🔄"}</span>
-                    <span style={{fontSize:11,color:plat.status==="rejected"?"#ff3355":"#ffab00",flex:1}}>{plat.remarks}</span>
-                  </div>
-                )}
+        {/* ══ DASHBOARD TAB ══ */}
+        {view==="dashboard"&&<>
+
+          {/* NO CONNECTIONS BANNER */}
+          {connectedCount===0&&(
+            <div style={{background:"linear-gradient(135deg,rgba(255,171,0,.07),rgba(255,107,53,.04))",border:"1px solid rgba(255,171,0,.25)",borderRadius:13,padding:"16px 20px",marginBottom:16,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+              <span style={{fontSize:28}}>👆</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:15,fontWeight:700,color:"#ffab00"}}>No stores connected yet</div>
+                <div style={{fontSize:12,color:"#64748b",marginTop:3}}>Go to Connect Stores tab → enter your username & password for each store → see real live data here</div>
               </div>
-            );
-          })}
-        </div>
+              <button onClick={()=>setView("connect")} style={{padding:"9px 18px",borderRadius:9,border:"1px solid rgba(255,171,0,.4)",background:"rgba(255,171,0,.1)",color:"#ffab00",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"'Rajdhani',sans-serif"}}>🔌 Connect Stores →</button>
+            </div>
+          )}
+
+          {/* STATS */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12}}>
+            {[
+              {l:"Connected",  v:stats.connected, c:"#00d4ff",s:`of ${STORES.length} stores`},
+              {l:"Approved",   v:stats.approved,  c:"#00e676",s:"live builds"},
+              {l:"In Review",  v:stats.review,    c:"#ffab00",s:"awaiting"},
+              {l:"Rejected",   v:stats.rejected,  c:"#ff3355",s:"need fix"},
+            ].map((sc,i)=>(
+              <div key={i} style={{background:"#0a0f1e",border:"1px solid #1a2540",borderRadius:10,padding:"12px 14px",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:sc.c}}/>
+                <div style={{...mn,fontSize:8,color:"#4a6080",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>{sc.l}</div>
+                <div style={{fontSize:26,fontWeight:700,color:sc.c}}>{sc.v}</div>
+                <div style={{...mn,fontSize:9,color:"#4a6080",marginTop:2}}>{sc.s}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* FILTERS */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10,alignItems:"center"}}>
+            {[["all","All"],["connected","🟢 Connected"],["disconnected","⚪ Not Connected"],["approved","✅ Approved"],["review","🔄 Review"],["rejected","❌ Rejected"]].map(([f,label])=>(
+              <button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?"rgba(0,212,255,.06)":"#0a0f1e",border:filter===f?"1px solid #00d4ff":"1px solid #1a2540",borderRadius:7,padding:"5px 11px",color:filter===f?"#00d4ff":"#4a6080",cursor:"pointer",fontWeight:700,fontSize:11,fontFamily:"'Rajdhani',sans-serif"}}>{label}</button>
+            ))}
+            <div style={{position:"relative",flex:1,minWidth:130}}>
+              <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",color:"#4a6080",fontSize:11}}>🔍</span>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…" style={{width:"100%",background:"#0a0f1e",border:"1px solid #1a2540",borderRadius:8,padding:"6px 10px 6px 26px",color:"#c8d8f0",fontSize:12,outline:"none",fontFamily:"'Rajdhani',sans-serif"}}/>
+            </div>
+          </div>
+
+          {/* PLATFORM ROWS */}
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            {filtered.map(plat=>{
+              const roCol=plat.rollout===100?"#00d4ff":plat.rollout>=70?"#00e676":"#ffab00";
+              const roGrad=plat.rollout===100?"linear-gradient(90deg,#0055ff,#00d4ff)":plat.rollout>=70?"linear-gradient(90deg,#00bfa5,#00e676)":"linear-gradient(90deg,#0055ff,#ffab00)";
+              return(
+                <div key={plat.id} style={{background:"#0a0f1e",border:`1px solid ${plat.isConnected?plat.border:plat.status==="rejected"?"rgba(255,51,85,.2)":"#1a2540"}`,borderRadius:11,overflow:"hidden",animation:"fadeIn .3s ease",opacity:plat.isConnected?1:.7}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=plat.border}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=plat.isConnected?plat.border:plat.status==="rejected"?"rgba(255,51,85,.2)":"#1a2540"}>
+                  <div style={{display:"flex",alignItems:"center",padding:"12px 14px",gap:10,flexWrap:"wrap"}}>
+
+                    {/* platform */}
+                    <div style={{display:"flex",alignItems:"center",gap:10,minWidth:200,flex:"0 0 200px"}}>
+                      <div style={{width:36,height:36,borderRadius:9,background:plat.bg,border:`1px solid ${plat.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,boxShadow:plat.isConnected?`0 0 10px ${plat.color}33`:"none"}}>{plat.icon}</div>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:13,color:"#fff",display:"flex",alignItems:"center",gap:6}}>
+                          {plat.name}
+                          {plat.isConnected
+                            ?<span style={{...mn,fontSize:8,color:"#00e676",background:"rgba(0,230,118,.1)",border:"1px solid rgba(0,230,118,.25)",borderRadius:3,padding:"1px 5px"}}>LIVE</span>
+                            :<span style={{...mn,fontSize:8,color:"#4a6080",background:"rgba(100,116,139,.08)",border:"1px solid rgba(100,116,139,.2)",borderRadius:3,padding:"1px 5px"}}>DEMO</span>
+                          }
+                        </div>
+                        <span style={{...mn,fontSize:8,color:plat.color,background:plat.bg,border:`1px solid ${plat.border}`,padding:"1px 5px",borderRadius:3,marginTop:2,display:"inline-block"}}>{plat.category}</span>
+                      </div>
+                    </div>
+
+                    {/* status */}
+                    <div style={{flex:"0 0 110px"}}><Badge status={plat.status}/></div>
+
+                    {/* version */}
+                    <div style={{flex:"0 0 100px"}}>
+                      <div style={{...mn,fontSize:13,fontWeight:700,color:"#00d4ff"}}>v{plat.version}</div>
+                      <div style={{...mn,fontSize:9,color:"#4a6080",marginTop:1}}>#{plat.build}</div>
+                    </div>
+
+                    {/* crash */}
+                    <div style={{flex:"0 0 105px"}}>
+                      {plat.isConnected
+                        ?<><div style={{...mn,fontSize:12,fontWeight:700,color:cc(plat.crash)}}>{cl(plat.crash)}</div>
+                           <div style={{...mn,fontSize:8,color:"#4a6080",marginTop:1}}>CRASH</div>
+                           {plat.crash!==null&&<div style={{height:3,background:"#1a2540",borderRadius:2,marginTop:3,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(plat.crash*20,100)}%`,background:cc(plat.crash),borderRadius:2}}/></div>}</>
+                        :<div style={{...mn,fontSize:11,color:"#2d4060",fontStyle:"italic"}}>Login to see</div>
+                      }
+                    </div>
+
+                    {/* ANR */}
+                    <div style={{flex:"0 0 95px"}}>
+                      {plat.isConnected
+                        ?<><div style={{...mn,fontSize:12,fontWeight:700,color:cc(plat.anr!==null?plat.anr*3:null)}}>{cl(plat.anr)}</div>
+                           <div style={{...mn,fontSize:8,color:"#4a6080",marginTop:1}}>ANR</div></>
+                        :<div style={{...mn,fontSize:11,color:"#2d4060",fontStyle:"italic"}}>Login to see</div>
+                      }
+                    </div>
+
+                    {/* rollout */}
+                    <div style={{flex:"0 0 130px"}}>
+                      {plat.isConnected
+                        ?<div style={{display:"flex",alignItems:"center",gap:6}}>
+                           <span style={{...mn,fontSize:11,fontWeight:700,color:roCol,width:34,flexShrink:0}}>{plat.rollout}%</span>
+                           <div style={{flex:1,height:5,background:"#1a2540",borderRadius:3,overflow:"hidden"}}>
+                             <div style={{height:"100%",width:`${plat.rollout}%`,background:roGrad,borderRadius:3}}/>
+                           </div>
+                         </div>
+                        :<div style={{...mn,fontSize:11,color:"#2d4060",fontStyle:"italic"}}>—</div>
+                      }
+                    </div>
+
+                    {/* login / disconnect btn */}
+                    <div style={{marginLeft:"auto"}}>
+                      {plat.isConnected
+                        ?<button onClick={()=>handleDisconnect(plat.id)} style={{display:"inline-flex",alignItems:"center",gap:4,background:"rgba(255,51,85,.07)",border:"1px solid rgba(255,51,85,.2)",borderRadius:6,padding:"5px 10px",cursor:"pointer",...mn,fontSize:9,color:"#ff3355",fontWeight:700}}>🔌 Disconnect</button>
+                        :<button onClick={()=>setLoginStore(STORES.find(s=>s.id===plat.id))} style={{display:"inline-flex",alignItems:"center",gap:4,background:plat.bg,border:`1px solid ${plat.border}`,borderRadius:6,padding:"5px 10px",cursor:"pointer",...mn,fontSize:9,color:plat.color,fontWeight:700}}>🔑 Login</button>
+                      }
+                    </div>
+                  </div>
+
+                  {/* rejection banner */}
+                  {plat.isConnected&&plat.status==="rejected"&&(
+                    <div style={{borderTop:"1px solid rgba(255,51,85,.2)",background:"rgba(255,51,85,.04)",padding:"7px 14px",display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:11}}>❌</span>
+                      <span style={{fontSize:11,color:"#ff3355"}}>Build rejected on this platform — check store console for details</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>}
       </div>
     </div>
 
-    {forceModal&&<ForceModal platform={forceModal} onConfirm={handleForce} onClose={()=>setForceModal(null)}/>}
-    {showSecrets&&<SecretsGuide onClose={()=>setShowSecrets(false)}/>}
-    {toast&&<div style={{position:"fixed",bottom:20,right:20,background:"#0f1628",border:"1px solid #243050",borderRadius:9,padding:"9px 15px",fontSize:12,zIndex:9999,display:"flex",alignItems:"center",gap:6,boxShadow:"0 8px 24px rgba(0,0,0,.4)",color:"#c8d8f0",animation:"fadeIn .25s ease"}}><span>{toast.icon}</span><span>{toast.msg}</span></div>}
+    {loginStore&&<LoginModal store={loginStore} onSuccess={handleLoginSuccess} onClose={()=>setLoginStore(null)}/>}
+    {toast&&<div style={{position:"fixed",bottom:20,right:20,background:"#0f1628",border:"1px solid #243050",borderRadius:9,padding:"9px 15px",fontSize:13,zIndex:9999,display:"flex",alignItems:"center",gap:7,boxShadow:"0 8px 24px rgba(0,0,0,.5)",color:"#c8d8f0",animation:"slideIn .3s ease"}}><span>{toast.icon}</span><span>{toast.msg}</span></div>}
   </div>;
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Dashboard/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
