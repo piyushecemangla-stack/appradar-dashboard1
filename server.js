@@ -15,7 +15,14 @@ app.use(cors({ origin:'*', credentials:true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended:true }));
 app.use(session({ secret: process.env.SESSION_SECRET||'appradar-secret', resave:false, saveUninitialized:false, cookie:{ secure:false, maxAge:7*24*60*60*1000 } }));
-app.use(express.static(path.join(__dirname,'public')));
+// serve static files from root folder (index.html lives at root)
+app.use(express.static(__dirname));
+// fallback — always return index.html for any unknown route
+app.get('*', (req, res) => {
+  const p = path.join(__dirname, 'index.html');
+  if (require('fs').existsSync(p)) res.sendFile(p);
+  else res.status(404).send('index.html not found in repo root');
+});
 
 // token store
 const TF = path.join(__dirname,'tokens.json');
