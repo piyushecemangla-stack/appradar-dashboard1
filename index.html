@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AppRadar PRO — Live Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#05080f;color:#c8d8f0;font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden;}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:#1a2540;border-radius:3px}
+input[type=range]{accent-color:#00d4ff;width:100%;}
+input[type=date]{color-scheme:dark;}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 6px #00e676}50%{opacity:.3;box-shadow:none}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fpulse{0%,100%{box-shadow:0 0 8px rgba(255,51,85,.5)}50%{box-shadow:0 0 20px rgba(255,51,85,.9)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const PLATFORMS = {
+  gp:{ name:"Google Play Store", short:"Play",    icon:"▶",  color:"#34d399", bg:"rgba(52,211,153,0.12)",  border:"rgba(52,211,153,0.3)",  category:"Mobile"   },
+  as:{ name:"Apple App Store",   short:"iOS",     icon:"🍎", color:"#60a5fa", bg:"rgba(96,165,250,0.12)",  border:"rgba(96,165,250,0.3)",  category:"Mobile"   },
+  ft:{ name:"Amazon Fire TV",    short:"Fire TV", icon:"🔥", color:"#fb923c", bg:"rgba(251,146,60,0.12)",  border:"rgba(251,146,60,0.3)",  category:"Smart TV" },
+  sm:{ name:"Samsung Galaxy",    short:"Samsung", icon:"⬡",  color:"#a78bfa", bg:"rgba(167,139,250,0.12)", border:"rgba(167,139,250,0.3)", category:"Smart TV" },
+  lg:{ name:"LG Content Store",  short:"LG",      icon:"◈",  color:"#f87171", bg:"rgba(248,113,113,0.12)", border:"rgba(248,113,113,0.3)", category:"Smart TV" },
+  rk:{ name:"Roku Channel",      short:"Roku",    icon:"◉",  color:"#fbbf24", bg:"rgba(251,191,36,0.12)",  border:"rgba(251,191,36,0.3)",  category:"Smart TV" },
+  wb:{ name:"Web / PWA",         short:"Web",     icon:"🌐", color:"#00d4ff", bg:"rgba(0,212,255,0.12)",   border:"rgba(0,212,255,0.3)",   category:"Web"      },
+  az:{ name:"Amazon Appstore",   short:"Amazon",  icon:"📦", color:"#ff9900", bg:"rgba(255,153,0,0.12)",   border:"rgba(255,153,0,0.3)",   category:"Mobile"   },
+  hw:{ name:"Huawei AppGallery", short:"Huawei",  icon:"🔷", color:"#cf0a2c", bg:"rgba(207,10,44,0.12)",   border:"rgba(207,10,44,0.3)",   category:"Mobile"   },
+};
+
+const STATUS = {
+  approved:{ label:"APPROVED",  color:"#00e676", bg:"rgba(0,230,118,0.1)",   border:"rgba(0,230,118,0.3)"   },
+  rejected:{ label:"REJECTED",  color:"#ff3355", bg:"rgba(255,51,85,0.1)",   border:"rgba(255,51,85,0.3)"   },
+  review:  { label:"IN REVIEW", color:"#ffab00", bg:"rgba(255,171,0,0.1)",   border:"rgba(255,171,0,0.3)"   },
+  pending: { label:"PENDING",   color:"#64748b", bg:"rgba(100,116,139,0.1)", border:"rgba(100,116,139,0.3)" },
+  live:    { label:"LIVE",      color:"#00d4ff", bg:"rgba(0,212,255,0.1)",   border:"rgba(0,212,255,0.3)"   },
+};
+
+const DEPLOY_GUIDE = {
+  gp:[
+    {n:1,title:"Generate Signed AAB",   status:"done",   cmd:"./gradlew bundleRelease",                       desc:"Build → Generate Signed Bundle (.aab). Use your release keystore file."},
+    {n:2,title:"Run Lint Checks",        status:"done",   cmd:"./gradlew lintRelease",                         desc:"Verify versionCode incremented, no debug flags, ProGuard applied."},
+    {n:3,title:"Upload to Play Console", status:"done",   cmd:null,                                            desc:"play.google.com/console → App → Production → Create new release → Upload AAB."},
+    {n:4,title:"Set Gradual Rollout",    status:"active", cmd:null,                                            desc:"Start at 10% → monitor crash rate 24h → expand 25% → 50% → 100%."},
+    {n:5,title:"Submit for Review",      status:"pending",cmd:null,                                            desc:"Add release notes in all languages → Review release → Start rollout."},
+    {n:6,title:"Monitor Android Vitals", status:"pending",cmd:null,                                            desc:"Target: crash rate < 1.09%, ANR rate < 0.47% to maintain Good status."},
+  ],
+  as:[
+    {n:1,title:"Archive in Xcode",      status:"done",   cmd:"xcodebuild archive -scheme YourApp",            desc:"Product → Archive. Ensure Release scheme and correct team signing."},
+    {n:2,title:"Validate & Upload",      status:"done",   cmd:"xcrun altool --upload-app -f App.ipa",          desc:"Organizer → Validate → Distribute → App Store Connect → Upload."},
+    {n:3,title:"Configure in ASC",       status:"done",   cmd:null,                                            desc:"appstoreconnect.apple.com → Select build → answer compliance questions."},
+    {n:4,title:"Phased Release",         status:"active", cmd:null,                                            desc:"Releases over 7 days: 1%→2%→5%→10%→20%→50%→100%. Monitor each stage."},
+    {n:5,title:"Submit for Review",      status:"active", cmd:null,                                            desc:"Add for Review → Submit. Apple reviews in 24–48 hours typically."},
+    {n:6,title:"Monitor Crashes",        status:"pending",cmd:null,                                            desc:"Xcode Organizer → Crashes  or  Firebase Crashlytics for real-time data."},
+  ],
+  ft:[
+    {n:1,title:"Build Fire TV APK",     status:"done",   cmd:"./gradlew assembleFiretvRelease",               desc:"Target API 25+. Set leanback launcher in AndroidManifest.xml."},
+    {n:2,title:"Test via ADB",           status:"done",   cmd:"adb connect <ip>:5555\nadb install app.apk",    desc:"Sideload to actual Fire TV Stick before submitting to store."},
+    {n:3,title:"Upload to Dev Console",  status:"done",   cmd:null,                                            desc:"developer.amazon.com → My Apps → Upload APK. Set device support."},
+    {n:4,title:"Add TV Screenshots",     status:"pending",cmd:null,                                            desc:"1920×1080 required. Fire TV requires TV-specific screenshots."},
+    {n:5,title:"Submit",                 status:"pending",cmd:null,                                            desc:"Review takes 1–3 business days."},
+  ],
+  sm:[
+    {n:1,title:"Build Samsung AAB",     status:"done",   cmd:"./gradlew bundleSamsungRelease",                desc:"Ensure Samsung IAP SDK integrated if using in-app purchases."},
+    {n:2,title:"Remote Test Lab",        status:"done",   cmd:null,                                            desc:"Test on real Samsung devices via Samsung Remote Test Lab."},
+    {n:3,title:"Seller Portal Upload",   status:"active", cmd:null,                                            desc:"seller.samsungapps.com → Content → Register → Upload binary."},
+    {n:4,title:"Submit for Review",      status:"pending",cmd:null,                                            desc:"3–7 business days. Samsung may request video demo for TV apps."},
+  ],
+  rk:[
+    {n:1,title:"Build Roku Package",    status:"pending",cmd:"zip -r YourApp.zip .",                          desc:"Use BrightScript or SceneGraph framework. Package as .pkg file."},
+    {n:2,title:"Enable Dev Mode",        status:"pending",cmd:"Home×3, Up×2, Right×5 on Roku remote",         desc:"On Roku remote: Home 3×, Up 2×, Right, Left, Right, Left, Right."},
+    {n:3,title:"Sideload & Test",        status:"pending",cmd:"curl -F 'archive=@app.zip' http://ROKU-IP/plugin_install", desc:"Upload via Roku dev portal at device IP address."},
+    {n:4,title:"Submit to Dashboard",    status:"pending",cmd:null,                                            desc:"developer.roku.com → Dashboard → Add Channel."},
+    {n:5,title:"Roku Review",            status:"pending",cmd:null,                                            desc:"Review takes 2–4 weeks. Prepare for content policy check."},
+  ],
+  wb:[
+    {n:1,title:"Production Build",      status:"done",   cmd:"npm run build",                                 desc:"Set API endpoints, disable source maps, enable compression."},
+    {n:2,title:"Test Locally",           status:"done",   cmd:"npx serve -s build -l 3000",                   desc:"Serve built files locally and verify all features work."},
+    {n:3,title:"Deploy to CDN",          status:"done",   cmd:"vercel --prod\n# or: firebase deploy --only hosting\n# or: netlify deploy --prod --dir=build", desc:"Push to Vercel / Netlify / Firebase Hosting."},
+    {n:4,title:"Clear CDN Cache",        status:"done",   cmd:"aws cloudfront create-invalidation --paths '/*'", desc:"Purge CDN cache so users get latest version immediately."},
+    {n:5,title:"Verify & Monitor",       status:"active", cmd:"curl -I https://yourapp.com",                  desc:"Check Core Web Vitals, monitor error rates in Sentry/Datadog."},
+  ],
+  hw:[
+    {n:1,title:"Fix HMS Core Version",  status:"active", cmd:"implementation 'com.huawei.hms:push:6.7.0.300'", desc:"Update build.gradle to HMS Core 6.x. Update agconnect-services.json."},
+    {n:2,title:"Re-sign with Huawei Key",status:"pending",cmd:"./gradlew bundleHuaweiRelease",                desc:"Use Huawei AppGallery signing key — NOT your Google Play key."},
+    {n:3,title:"AppGallery Connect",     status:"pending",cmd:null,                                            desc:"appgallery.huawei.com → My Apps → Version information → Upload."},
+    {n:4,title:"Resubmit",              status:"pending",cmd:null,                                            desc:"Update release notes with fix description. Review: 1–3 days."},
+  ],
+  lg:[
+    {n:1,title:"Build LG APK",          status:"done",   cmd:"./gradlew assembleLgRelease",                   desc:"Target webOS / Tizen. Use LG SmartTV SDK."},
+    {n:2,title:"LG Seller Lounge",       status:"done",   cmd:null,                                            desc:"seller.lgappstv.com → My Apps → Register Content."},
+    {n:3,title:"Upload & Configure",     status:"done",   cmd:null,                                            desc:"Upload binary, add TV screenshots (1920×1080), content rating."},
+    {n:4,title:"Review Complete",        status:"done",   cmd:null,                                            desc:"LG review completed. App is live on LG Content Store."},
+  ],
+  az:[
+    {n:1,title:"Build Amazon APK",      status:"done",   cmd:"./gradlew assembleAmazonRelease",               desc:"Amazon uses APK not AAB. Use Amazon Device Targeting in manifest."},
+    {n:2,title:"Device Testing",         status:"done",   cmd:null,                                            desc:"Test on Fire tablet & Fire TV via Amazon Device Farm."},
+    {n:3,title:"Developer Console",      status:"done",   cmd:null,                                            desc:"developer.amazon.com → My Apps → Upload & configure listing."},
+    {n:4,title:"Review Complete",        status:"done",   cmd:null,                                            desc:"Amazon review completed. App live on Amazon Appstore."},
+  ],
+};
+
+const PLATFORMS_DATA = [
+  {id:"gp",currentVer:"4.2.1",buildNo:"421",   prevVer:"4.1.0",prevBuild:"410",status:"approved",rollout:100,force:true, crash:0.42,anr:0.08,submittedDate:"2026-03-01",approvedDate:"2026-03-05",lastUpdated:"2026-03-05",remarks:"All checks passed. Store listing updated with new screenshots.",history:[{v:"4.1.0",bld:"410",date:"2026-02-10",status:"approved"},{v:"4.0.9",bld:"409",date:"2026-01-15",status:"approved"}]},
+  {id:"as",currentVer:"4.2.1",buildNo:"210",   prevVer:"4.1.0",prevBuild:"198",status:"approved",rollout:100,force:true, crash:0.38,anr:0.06,submittedDate:"2026-03-01",approvedDate:"2026-03-04",lastUpdated:"2026-03-04",remarks:"Approved by Apple App Review team.",history:[{v:"4.1.0",bld:"198",date:"2026-02-08",status:"approved"},{v:"4.0.9",bld:"190",date:"2026-01-12",status:"approved"}]},
+  {id:"ft",currentVer:"4.2.0",buildNo:"185",   prevVer:"4.0.9",prevBuild:"170",status:"approved",rollout:100,force:false,crash:0.51,anr:0.11,submittedDate:"2026-02-25",approvedDate:"2026-02-28",lastUpdated:"2026-02-28",remarks:"",history:[{v:"4.0.9",bld:"170",date:"2026-01-20",status:"approved"}]},
+  {id:"sm",currentVer:"4.1.9",buildNo:"178",   prevVer:"4.1.5",prevBuild:"165",status:"review",  rollout:0,  force:false,crash:0.61,anr:0.13,submittedDate:"2026-03-04",approvedDate:null,          lastUpdated:"2026-03-06",remarks:"Samsung store review in progress. Expected 3–5 business days.",history:[{v:"4.1.5",bld:"165",date:"2026-02-05",status:"approved"}]},
+  {id:"lg",currentVer:"4.1.5",buildNo:"160",   prevVer:"4.1.2",prevBuild:"148",status:"approved",rollout:100,force:false,crash:0.44,anr:0.09,submittedDate:"2026-02-18",approvedDate:"2026-02-20",lastUpdated:"2026-02-20",remarks:"",history:[{v:"4.1.2",bld:"148",date:"2026-01-08",status:"approved"}]},
+  {id:"rk",currentVer:"4.0.9",buildNo:"140",   prevVer:"4.0.5",prevBuild:"128",status:"pending", rollout:0,  force:false,crash:null, anr:null, submittedDate:null,          approvedDate:null,          lastUpdated:"2026-02-10",remarks:"Submission package being prepared. Target: 2026-03-10.",history:[{v:"4.0.5",bld:"128",date:"2025-12-15",status:"approved"}]},
+  {id:"wb",currentVer:"4.2.1",buildNo:"web-88",prevVer:"4.2.0",prevBuild:"web-82",status:"live", rollout:100,force:false,crash:0.12,anr:0.02,submittedDate:"2026-03-05",approvedDate:"2026-03-05",lastUpdated:"2026-03-05",remarks:"CDN deploy successful. Cloudflare cache cleared.",history:[{v:"4.2.0",bld:"web-82",date:"2026-02-20",status:"live"}]},
+  {id:"az",currentVer:"4.1.9",buildNo:"195",   prevVer:"4.1.5",prevBuild:"180",status:"approved",rollout:100,force:false,crash:0.58,anr:0.12,submittedDate:"2026-02-22",approvedDate:"2026-02-26",lastUpdated:"2026-02-26",remarks:"Amazon store review completed.",history:[{v:"4.1.5",bld:"180",date:"2026-01-18",status:"approved"}]},
+  {id:"hw",currentVer:"4.1.5",buildNo:"162",   prevVer:"4.1.0",prevBuild:"150",status:"rejected",rollout:0,  force:false,crash:0.77,anr:0.16,submittedDate:"2026-03-02",approvedDate:null,          lastUpdated:"2026-03-05",remarks:"HMS Core API version mismatch. Must update to HMS Core 6.x before resubmission.",history:[{v:"4.1.0",bld:"150",date:"2026-01-12",status:"approved"}]},
+];
+
+const APP = {name:"StreamMax",fullName:"StreamMax — Video Streaming App",pkg:"com.streammax.app",icon:"📺"};
+
+const cc = v => v===null?"#4a6080":v<0.5?"#00e676":v<1.5?"#ffab00":"#ff3355";
+const cl = v => v===null?"N/A":v.toFixed(2)+"%";
+const sc = s => s==="done"?"#00e676":s==="active"?"#00d4ff":"#2d4060";
+
+const m = {fontFamily:"'JetBrains Mono',monospace"};
+
+function Tag({sk}){
+  const p=PLATFORMS[sk];
+  return <span style={{display:"inline-flex",alignItems:"center",gap:3,padding:"2px 8px",borderRadius:5,background:p.bg,border:`1px solid ${p.border}`,color:p.color,...m,fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>{p.icon} {p.short}</span>;
+}
+
+function Badge({status,small}){
+  const s=STATUS[status]||STATUS.pending;
+  return <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:small?"2px 7px":"3px 10px",borderRadius:20,background:s.bg,border:`1px solid ${s.border}`,color:s.color,...m,fontSize:small?9:10,fontWeight:700,whiteSpace:"nowrap"}}>
+    <span style={{width:5,height:5,borderRadius:"50%",background:s.color,display:"inline-block"}}/>{s.label}
+  </span>;
+}
+
+function ForceModal({platform,onConfirm,onClose}){
+  const p=PLATFORMS[platform.id];
+  const [pct,setPct]=useState(platform.rollout||100);
+  const [forceOn,setForceOn]=useState(platform.force);
+  return (
+    <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",backdropFilter:"blur(8px)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"#0a0f1e",border:"1px solid #243050",borderRadius:18,width:"100%",maxWidth:440}}>
+        <div style={{background:"#0f1628",borderBottom:"1px solid #1a2540",padding:"16px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderRadius:"18px 18px 0 0"}}>
+          <div><div style={{fontSize:17,fontWeight:700,color:"#fff"}}>⚡ Rollout Control</div><div style={{marginTop:5}}><Tag sk={platform.id}/></div></div>
+          <button onClick={onClose} style={{background:"#141d35",border:"1px solid #1a2540",borderRadius:7,width:28,height:28,cursor:"pointer",color:"#4a6080",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+        <div style={{padding:20}}>
+          <div style={{background:"rgba(255,51,85,.07)",border:"1px solid rgba(255,51,85,.2)",borderRadius:9,padding:12,marginBottom:16,fontSize:12,color:"#c8d8f0",lineHeight:1.6}}>⚠️ <strong style={{color:"#ff3355"}}>Force Mode</strong> = users <strong style={{color:"#ff3355"}}>cannot use app</strong> without updating. Use only for critical fixes.</div>
+          <div style={{marginBottom:18}}>
+            <div style={{...m,fontSize:9,color:"#4a6080",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:8}}>ROLLOUT PERCENTAGE</div>
+            <input type="range" min={0} max={100} value={pct} onChange={e=>setPct(Number(e.target.value))}/>
+            <div style={{...m,fontSize:32,fontWeight:700,color:pct===100?"#00d4ff":"#ffab00",textAlign:"center",letterSpacing:2,margin:"6px 0"}}>{pct}%</div>
+          </div>
+          <div onClick={()=>setForceOn(!forceOn)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#0f1628",border:"1px solid #1a2540",borderRadius:9,padding:"12px 16px",marginBottom:16,cursor:"pointer"}}>
+            <div><div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Force Update Mode</div><div style={{fontSize:11,color:"#4a6080",marginTop:2}}>Mandatory update for all users</div></div>
+            <div style={{width:44,height:24,borderRadius:12,background:forceOn?"#ff3355":"#1a2540",position:"relative",transition:"background .2s",border:`1px solid ${forceOn?"#ff3355":"#243050"}`,flexShrink:0}}>
+              <div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:2,left:forceOn?22:2,transition:"left .2s"}}/>
+            </div>
+          </div>
+          <button onClick={()=>onConfirm(pct,forceOn)} style={{width:"100%",padding:12,borderRadius:9,border:"none",cursor:"pointer",fontSize:14,fontWeight:700,color:"#fff",background:forceOn&&pct===100?"linear-gradient(135deg,#9b1c2e,#ff3355)":"linear-gradient(135deg,#0055ff,#00d4ff)",letterSpacing:1}}>
+            {forceOn&&pct===100?"⚡ DEPLOY FORCE UPDATE":`📈 SET ROLLOUT TO ${pct}%`}
+          </button>
+          <button onClick={onClose} style={{width:"100%",padding:9,borderRadius:8,border:"1px solid #1a2540",background:"transparent",color:"#4a6080",cursor:"pointer",fontSize:13,fontWeight:600,marginTop:8}}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeployModal({platformId,onClose}){
+  const steps=DEPLOY_GUIDE[platformId];
+  const p=PLATFORMS[platformId];
+  if(!steps)return null;
+  return (
+    <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",backdropFilter:"blur(8px)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto"}}>
+      <div style={{background:"#0a0f1e",border:"1px solid #243050",borderRadius:18,width:"100%",maxWidth:660,maxHeight:"88vh",overflowY:"auto"}}>
+        <div style={{background:"#0f1628",borderBottom:"1px solid #1a2540",padding:"16px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,zIndex:2,borderRadius:"18px 18px 0 0"}}>
+          <div><div style={{fontSize:18,fontWeight:700,color:"#fff"}}>🚀 Deployment Guide</div><div style={{marginTop:5}}><Tag sk={platformId}/></div></div>
+          <button onClick={onClose} style={{background:"#141d35",border:"1px solid #1a2540",borderRadius:7,width:28,height:28,cursor:"pointer",color:"#4a6080",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+        <div style={{padding:22}}>
+          {steps.map((step,i)=>{
+            const col=sc(step.status);
+            const done=step.status==="done",active=step.status==="active";
+            return (
+              <div key={i} style={{display:"flex",gap:14,marginBottom:4}}>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0}}>
+                  <div style={{width:32,height:32,borderRadius:"50%",background:done?"rgba(0,230,118,.15)":active?"rgba(0,212,255,.15)":"#0f1628",border:`2px solid ${col}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:col}}>{done?"✓":step.n}</div>
+                  {i<steps.length-1&&<div style={{width:2,flex:1,minHeight:16,background:done?"rgba(0,230,118,.3)":"#1a2540",margin:"3px 0"}}/>}
+                </div>
+                <div style={{flex:1,paddingBottom:18}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
+                    <span style={{fontSize:14,fontWeight:700,color:done?"#00e676":active?"#00d4ff":"#c8d8f0"}}>{step.title}</span>
+                    <span style={{...m,fontSize:9,padding:"2px 7px",borderRadius:4,background:`${col}15`,color:col,border:`1px solid ${col}33`}}>{done?"DONE":active?"IN PROGRESS":"UPCOMING"}</span>
+                  </div>
+                  <div style={{fontSize:12,color:"#64748b",lineHeight:1.6,marginBottom:step.cmd?8:0}}>{step.desc}</div>
+                  {step.cmd&&<div style={{background:"#050810",border:"1px solid #1a2540",borderRadius:8,padding:"10px 14px",marginTop:6}}>
+                    <div style={{...m,fontSize:9,color:"#4a6080",marginBottom:5,letterSpacing:1}}>COMMAND</div>
+                    <pre style={{...m,fontSize:11,color:"#00e676",margin:0,whiteSpace:"pre-wrap",wordBreak:"break-all"}}>{step.cmd}</pre>
+                  </div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailModal({plat,onClose,onForce,onDeploy}){
+  const p=PLATFORMS[plat.id];
+  return (
+    <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",backdropFilter:"blur(8px)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center",padding:16,overflowY:"auto"}}>
+      <div style={{background:"#0a0f1e",border:"1px solid #243050",borderRadius:18,width:"100%",maxWidth:680,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{background:"#0f1628",borderBottom:"1px solid #1a2540",padding:"16px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",position:"sticky",top:0,zIndex:2,borderRadius:"18px 18px 0 0"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:40,height:40,borderRadius:10,background:p.bg,border:`1px solid ${p.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{p.icon}</div>
+            <div><div style={{fontSize:18,fontWeight:700,color:"#fff"}}>{p.name}</div><div style={{...m,fontSize:10,color:"#4a6080",marginTop:2}}>v{plat.currentVer} · Build #{plat.buildNo}</div></div>
+          </div>
+          <button onClick={onClose} style={{background:"#141d35",border:"1px solid #1a2540",borderRadius:7,width:28,height:28,cursor:"pointer",color:"#4a6080",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+        <div style={{padding:22}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:18}}>
+            {[{l:"Crash Rate",v:cl(plat.crash),c:cc(plat.crash)},{l:"ANR Rate",v:cl(plat.anr),c:cc(plat.anr!==null?plat.anr*3:null)},{l:"Rollout",v:plat.rollout+"%",c:plat.force?"#ff3355":plat.rollout===100?"#00d4ff":"#ffab00"}].map((mt,i)=>(
+              <div key={i} style={{background:"#0f1628",border:"1px solid #1a2540",borderRadius:9,padding:14,textAlign:"center"}}>
+                <div style={{...m,fontSize:9,color:"#4a6080",textTransform:"uppercase",letterSpacing:1}}>{mt.l}</div>
+                <div style={{...m,fontSize:22,fontWeight:700,color:mt.c,margin:"6px 0"}}>{mt.v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{background:"#0f1628",border:"1px solid #1a2540",borderRadius:9,padding:14,marginBottom:14}}>
+            {[["Status",<Badge status={plat.status}/>],["Current Version",<span style={{...m,color:"#00d4ff",fontWeight:700}}>v{plat.currentVer} (#{plat.buildNo})</span>],["Previous Version",<span style={{...m,color:"#4a6080"}}>v{plat.prevVer} (#{plat.prevBuild})</span>],["Submitted",plat.submittedDate||"—"],["Approved",plat.approvedDate||"—"],["Force Mode",<span style={{color:plat.force?"#ff3355":"#4a6080",fontWeight:700}}>{plat.force?"⚡ ENABLED":"Disabled"}</span>]].map(([k,v],i)=>(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:i<5?"1px solid rgba(26,37,64,0.5)":"none"}}>
+                <span style={{fontSize:12,color:"#4a6080"}}>{k}</span><span style={{fontSize:12,color:"#c8d8f0"}}>{v}</span>
+              </div>
+            ))}
+          </div>
+          {plat.remarks&&<div style={{background:plat.status==="rejected"?"rgba(255,51,85,.06)":"rgba(255,171,0,.06)",border:`1px solid ${plat.status==="rejected"?"rgba(255,51,85,.3)":"rgba(255,171,0,.3)"}`,borderLeft:`3px solid ${plat.status==="rejected"?"#ff3355":"#ffab00"}`,borderRadius:9,padding:12,marginBottom:14,fontSize:12,color:"#c8d8f0",lineHeight:1.6}}>💬 {plat.remarks}</div>}
+          <div style={{marginBottom:16}}>
+            <div style={{...m,fontSize:9,color:"#4a6080",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:10,paddingBottom:7,borderBottom:"1px solid #1a2540"}}>Version History</div>
+            {plat.history.map((h,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid rgba(26,37,64,.4)"}}>
+                <div style={{width:6,height:6,borderRadius:"50%",background:"#00e676",flexShrink:0}}/>
+                <span style={{...m,fontSize:12,fontWeight:700,color:"#00d4ff",width:55}}>v{h.v}</span>
+                <span style={{...m,fontSize:10,color:"#4a6080",width:55}}>#{h.bld}</span>
+                <Badge status={h.status} small/>
+                <span style={{...m,fontSize:10,color:"#4a6080",marginLeft:"auto"}}>{h.date}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button onClick={()=>{onClose();onDeploy(plat.id);}} style={{padding:"9px 16px",borderRadius:8,border:"1px solid rgba(0,212,255,.3)",background:"rgba(0,212,255,.08)",color:"#00d4ff",cursor:"pointer",fontWeight:700,fontSize:13}}>🚀 Deploy Guide</button>
+            <button onClick={()=>{onClose();onForce(plat);}} style={{padding:"9px 16px",borderRadius:8,border:"1px solid rgba(255,51,85,.3)",background:"rgba(255,51,85,.08)",color:"#ff3355",cursor:"pointer",fontWeight:700,fontSize:13}}>⚡ Rollout / Force</button>
+            <button onClick={onClose} style={{padding:"9px 16px",borderRadius:8,border:"1px solid #1a2540",background:"transparent",color:"#4a6080",cursor:"pointer",fontWeight:600,fontSize:13}}>Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard(){
+  const [platforms,setPlatforms]=useState(JSON.parse(JSON.stringify(PLATFORMS_DATA)));
+  const [tab,setTab]=useState("dashboard");
+  const [filter,setFilter]=useState("all");
+  const [search,setSearch]=useState("");
+  const [detail,setDetail]=useState(null);
+  const [forceModal,setForceModal]=useState(null);
+  const [deployModal,setDeployModal]=useState(null);
+  const [toast,setToast]=useState(null);
+  const [clock,setClock]=useState("");
+  const [spinning,setSpinning]=useState(false);
+  const [dateFrom,setDateFrom]=useState("2026-02-28");
+  const [dateTo,setDateTo]=useState("2026-03-06");
+  const [preset,setPreset]=useState("7d");
+
+  useEffect(()=>{
+    const t=setInterval(()=>setClock(new Date().toLocaleTimeString("en-IN",{hour12:false})),1000);
+    return()=>clearInterval(t);
+  },[]);
+
+  useEffect(()=>{
+    const t=setInterval(()=>{
+      setPlatforms(prev=>prev.map(p=>({...p,
+        crash:p.crash!==null?Math.max(0.05,parseFloat((p.crash+(Math.random()-.5)*.06).toFixed(2))):null,
+        anr:p.anr!==null?Math.max(0.01,parseFloat((p.anr+(Math.random()-.5)*.03).toFixed(2))):null,
+      })));
+    },30000);
+    return()=>clearInterval(t);
+  },[]);
+
+  const showToast=(icon,msg)=>{setToast({icon,msg});setTimeout(()=>setToast(null),3000);};
+
+  const doRefresh=()=>{
+    setSpinning(true);
+    setTimeout(()=>{
+      setPlatforms(prev=>prev.map(p=>({...p,
+        crash:p.crash!==null?Math.max(0.05,parseFloat((p.crash+(Math.random()-.5)*.12).toFixed(2))):null,
+        anr:p.anr!==null?Math.max(0.01,parseFloat((p.anr+(Math.random()-.5)*.05).toFixed(2))):null,
+      })));
+      setSpinning(false);
+      showToast("🔄","Data refreshed successfully");
+    },800);
+  };
+
+  const handleForceConfirm=(pct,forceMode)=>{
+    setPlatforms(prev=>prev.map(p=>p.id===forceModal.id?{...p,rollout:pct,force:forceMode}:p));
+    showToast(forceMode&&pct===100?"⚡":"📈",`${PLATFORMS[forceModal.id].short} → ${pct}%${forceMode?" · Force ON":""}`);
+    setForceModal(null);
+  };
+
+  const doPreset=(p)=>{
+    setPreset(p);
+    const off={"7d":7,"30d":30,"90d":90,"ytd":65,"all":365};
+    const now=new Date("2026-03-06");const from=new Date(now);from.setDate(from.getDate()-(off[p]||7));
+    setDateFrom(from.toISOString().split("T")[0]);setDateTo("2026-03-06");
+  };
+
+  const stats={
+    total:platforms.length,
+    approved:platforms.filter(p=>["approved","live"].includes(p.status)).length,
+    review:platforms.filter(p=>p.status==="review").length,
+    rejected:platforms.filter(p=>p.status==="rejected").length,
+    pending:platforms.filter(p=>p.status==="pending").length,
+    forced:platforms.filter(p=>p.force).length,
+    worstCrash:[...platforms].filter(p=>p.crash!==null).sort((a,b)=>b.crash-a.crash)[0],
+    worstAnr:[...platforms].filter(p=>p.anr!==null).sort((a,b)=>b.anr-a.anr)[0],
+  };
+
+  const q=search.toLowerCase();
+  const filtered=platforms.filter(p=>{
+    const mf=filter==="all"||p.status===filter||(filter==="force"&&p.force)||(filter==="highcrash"&&p.crash>=1.5);
+    const ms=!q||PLATFORMS[p.id].name.toLowerCase().includes(q)||p.currentVer.includes(q)||p.status.includes(q);
+    return mf&&ms;
+  });
+
+  return (
+    <div style={{background:"#05080f",minHeight:"100vh",color:"#c8d8f0",fontFamily:"'Rajdhani',sans-serif",fontSize:14}}>
+      <div style={{position:"fixed",inset:0,backgroundImage:"linear-gradient(rgba(0,212,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.018) 1px,transparent 1px)",backgroundSize:"50px 50px",pointerEvents:"none",zIndex:0}}/>
+      <div style={{position:"relative",zIndex:1}}>
+
+        {/* HEADER */}
+        <header style={{background:"linear-gradient(135deg,#0a0f1e,#0f1628)",borderBottom:"1px solid #1a2540",padding:"11px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:11}}>
+            <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,#00d4ff,#0055ff)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,boxShadow:"0 0 18px rgba(0,212,255,.4)",flexShrink:0}}>📡</div>
+            <div>
+              <div style={{fontSize:20,fontWeight:700,letterSpacing:2,color:"#fff",lineHeight:1}}>App<span style={{color:"#00d4ff"}}>Radar</span> <span style={{fontSize:12,color:"#4a6080",fontWeight:400}}>PRO</span></div>
+              <div style={{...m,fontSize:8,color:"#4a6080",letterSpacing:2}}>1 APP · 9 PLATFORMS · LIVE</div>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(0,212,255,.05)",border:"1px solid rgba(0,212,255,.15)",borderRadius:10,padding:"7px 14px"}}>
+            <span style={{fontSize:20}}>{APP.icon}</span>
+            <div>
+              <div style={{fontWeight:700,fontSize:14,color:"#fff"}}>{APP.fullName}</div>
+              <div style={{...m,fontSize:9,color:"#4a6080"}}>{APP.pkg} · {platforms.length} platforms</div>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(0,230,118,.08)",border:"1px solid rgba(0,230,118,.2)",borderRadius:20,padding:"4px 11px",...m,fontSize:10,color:"#00e676",letterSpacing:1.5}}>
+              <div style={{width:6,height:6,background:"#00e676",borderRadius:"50%",animation:"blink 1.4s infinite"}}/>LIVE
+            </div>
+            <div style={{...m,fontSize:11,color:"#4a6080"}}>{clock}</div>
+            <button onClick={doRefresh} style={{display:"flex",alignItems:"center",gap:4,background:"#141d35",border:"1px solid #1a2540",borderRadius:8,padding:"6px 13px",color:"#c8d8f0",cursor:"pointer",fontWeight:600,fontSize:12,fontFamily:"'Rajdhani',sans-serif"}}>
+              <span style={{display:"inline-block",transition:"transform .8s",transform:spinning?"rotate(360deg)":"none"}}>↻</span> Refresh
+            </button>
+          </div>
+        </header>
+
+        {/* TABS */}
+        <div style={{background:"#0a0f1e",borderBottom:"1px solid #1a2540",padding:"0 18px",display:"flex",gap:0}}>
+          {[["dashboard","📊 Dashboard"],["deploy","🚀 Deploy Guide"]].map(([t,label])=>(
+            <button key={t} onClick={()=>setTab(t)} style={{padding:"11px 18px",border:"none",background:"transparent",cursor:"pointer",fontFamily:"'Rajdhani',sans-serif",fontSize:13,fontWeight:700,letterSpacing:.5,color:tab===t?"#00d4ff":"#4a6080",borderBottom:tab===t?"2px solid #00d4ff":"2px solid transparent",transition:"all .2s"}}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{padding:"14px 18px"}}>
+
+          {tab==="dashboard"&&<>
+            {/* DATE BAR */}
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:"#0a0f1e",border:"1px solid #1a2540",borderRadius:11,padding:"9px 14px",marginBottom:12}}>
+              <span style={{...m,fontSize:9,color:"#4a6080",letterSpacing:1.5,textTransform:"uppercase",flexShrink:0}}>Range</span>
+              <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{background:"#0f1628",border:"1px solid #243050",borderRadius:6,padding:"4px 9px",color:"#c8d8f0",...m,fontSize:10,outline:"none"}}/>
+              <span style={{color:"#4a6080"}}>→</span>
+              <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{background:"#0f1628",border:"1px solid #243050",borderRadius:6,padding:"4px 9px",color:"#c8d8f0",...m,fontSize:10,outline:"none"}}/>
+              {["7d","30d","90d","ytd","all"].map(p=>(
+                <button key={p} onClick={()=>doPreset(p)} style={{background:preset===p?"rgba(0,212,255,.06)":"#0f1628",border:preset===p?"1px solid #00d4ff":"1px solid #1a2540",borderRadius:5,padding:"3px 10px",color:preset===p?"#00d4ff":"#4a6080",cursor:"pointer",fontWeight:700,fontSize:10,textTransform:"uppercase",fontFamily:"'JetBrains Mono',monospace"}}>{p}</button>
+              ))}
+              <span style={{...m,fontSize:10,color:"#2d4060",marginLeft:"auto"}}>{dateFrom} → {dateTo}</span>
+            </div>
+
+            {/* STATS */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:8}}>
+              {[{l:"Platforms",v:stats.total,c:"#00d4ff",s:"tracked"},{l:"Live / Approved",v:stats.approved,c:"#00e676",s:"deployed"},{l:"In Review",v:stats.review,c:"#ffab00",s:"awaiting"},{l:"Rejected",v:stats.rejected,c:"#ff3355",s:"need fix"}].map((sc2,i)=>(
+                <div key={i} style={{background:"#0a0f1e",border:"1px solid #1a2540",borderRadius:10,padding:"11px 14px",position:"relative",overflow:"hidden"}}>
+                  <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:sc2.c}}/>
+                  <div style={{...m,fontSize:8,color:"#4a6080",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>{sc2.l}</div>
+                  <div style={{fontSize:26,fontWeight:700,color:sc2.c}}>{sc2.v}</div>
+                  <div style={{...m,fontSize:9,color:"#4a6080",marginTop:2}}>{sc2.s}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12}}>
+              {[
+                {l:"Worst Crash",v:stats.worstCrash?stats.worstCrash.crash.toFixed(2)+"%":"—",c:"#ff3355",s:stats.worstCrash?PLATFORMS[stats.worstCrash.id]?.short:""},
+                {l:"Worst ANR",  v:stats.worstAnr?stats.worstAnr.anr.toFixed(2)+"%":"—",    c:"#ffab00",s:stats.worstAnr?PLATFORMS[stats.worstAnr.id]?.short:""},
+                {l:"Force Active",v:stats.forced,c:"#ff3355",s:"mandatory updates"},
+                {l:"Pending",     v:stats.pending,c:"#64748b",s:"not submitted yet"},
+              ].map((sc2,i)=>(
+                <div key={i} style={{background:"#0a0f1e",border:"1px solid #1a2540",borderRadius:10,padding:"11px 14px",position:"relative",overflow:"hidden"}}>
+                  <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:sc2.c}}/>
+                  <div style={{...m,fontSize:8,color:"#4a6080",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>{sc2.l}</div>
+                  <div style={{fontSize:26,fontWeight:700,color:sc2.c}}>{sc2.v}</div>
+                  <div style={{...m,fontSize:9,color:"#4a6080",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sc2.s}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS */}
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10,alignItems:"center"}}>
+              {[["all","All"],["approved","✅ Live"],["review","🔄 Review"],["rejected","❌ Rejected"],["pending","⏸ Pending"],["force","⚡ Forced"],["highcrash","🔴 High Crash"]].map(([f,label])=>(
+                <button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?"rgba(0,212,255,.06)":"#0a0f1e",border:filter===f?"1px solid #00d4ff":"1px solid #1a2540",borderRadius:7,padding:"5px 11px",color:filter===f?"#00d4ff":"#4a6080",cursor:"pointer",fontWeight:700,fontSize:11,fontFamily:"'Rajdhani',sans-serif",transition:"all .2s"}}>{label}</button>
+              ))}
+              <div style={{position:"relative",flex:1,minWidth:140}}>
+                <span style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",color:"#4a6080",fontSize:11}}>🔍</span>
+                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search platform, version…" style={{width:"100%",background:"#0a0f1e",border:"1px solid #1a2540",borderRadius:8,padding:"6px 10px 6px 26px",color:"#c8d8f0",fontSize:12,outline:"none",fontFamily:"'Rajdhani',sans-serif"}}/>
+              </div>
+            </div>
+
+            {/* APP HEADER */}
+            <div style={{background:"linear-gradient(135deg,rgba(0,212,255,.05),rgba(0,85,255,.03))",border:"1px solid rgba(0,212,255,.18)",borderRadius:13,padding:"12px 16px",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:42,height:42,borderRadius:11,background:"linear-gradient(135deg,#1a3a5c,#0d1b2a)",border:"1px solid rgba(0,212,255,.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,boxShadow:"0 4px 16px rgba(0,0,0,.4)"}}>{APP.icon}</div>
+                <div>
+                  <div style={{fontSize:17,fontWeight:700,color:"#fff"}}>{APP.fullName}</div>
+                  <div style={{...m,fontSize:9,color:"#4a6080",marginTop:2}}>{APP.pkg}</div>
+                </div>
+              </div>
+              <div style={{...m,fontSize:11,color:"#4a6080"}}>{filtered.length} / {platforms.length} platforms</div>
+            </div>
+
+            {/* PLATFORM ROWS */}
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              {filtered.map((plat)=>{
+                const p=PLATFORMS[plat.id];
+                const hasGuide=!!DEPLOY_GUIDE[plat.id];
+                const roCol=plat.force?"#ff3355":plat.rollout===100?"#00d4ff":plat.rollout>=70?"#00e676":"#ffab00";
+                const roGrad=plat.force?"linear-gradient(90deg,#9b1c2e,#ff3355)":plat.rollout===100?"linear-gradient(90deg,#0055ff,#00d4ff)":plat.rollout>=70?"linear-gradient(90deg,#00bfa5,#00e676)":"linear-gradient(90deg,#0055ff,#ffab00)";
+                return (
+                  <div key={plat.id} style={{background:"#0a0f1e",border:`1px solid ${plat.status==="rejected"?"rgba(255,51,85,.25)":plat.status==="review"?"rgba(255,171,0,.15)":"#1a2540"}`,borderRadius:11,overflow:"hidden",animation:"fadeIn .3s ease"}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=p.border}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=plat.status==="rejected"?"rgba(255,51,85,.25)":plat.status==="review"?"rgba(255,171,0,.15)":"#1a2540"}>
+                    <div style={{display:"flex",alignItems:"center",padding:"11px 14px",gap:10,cursor:"pointer",flexWrap:"wrap"}} onClick={()=>setDetail(plat)}>
+                      <div style={{display:"flex",alignItems:"center",gap:9,minWidth:190,flex:"0 0 190px"}}>
+                        <div style={{width:34,height:34,borderRadius:8,background:p.bg,border:`1px solid ${p.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{p.icon}</div>
+                        <div>
+                          <div style={{fontWeight:700,fontSize:13,color:"#fff",lineHeight:1.2}}>{p.name}</div>
+                          <span style={{...m,fontSize:8,color:p.color,background:p.bg,border:`1px solid ${p.border}`,padding:"1px 5px",borderRadius:3,marginTop:2,display:"inline-block"}}>{p.category}</span>
+                        </div>
+                      </div>
+                      <div style={{flex:"0 0 110px"}}><Badge status={plat.status}/></div>
+                      <div style={{flex:"0 0 100px"}}>
+                        <div style={{...m,fontSize:13,fontWeight:700,color:"#00d4ff"}}>v{plat.currentVer}</div>
+                        <div style={{...m,fontSize:9,color:"#4a6080",marginTop:1}}>#{plat.buildNo}</div>
+                      </div>
+                      <div style={{flex:"0 0 90px"}}>
+                        <div style={{...m,fontSize:11,color:"#4a6080"}}>v{plat.prevVer}</div>
+                        <div style={{...m,fontSize:9,color:"#2d4060",marginTop:1}}>#{plat.prevBuild}</div>
+                      </div>
+                      <div style={{flex:"0 0 105px"}}>
+                        <div style={{...m,fontSize:12,fontWeight:700,color:cc(plat.crash)}}>{cl(plat.crash)}</div>
+                        <div style={{...m,fontSize:8,color:"#4a6080",marginTop:1}}>CRASH</div>
+                        {plat.crash!==null&&<div style={{height:3,background:"#1a2540",borderRadius:2,marginTop:3,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(plat.crash*20,100)}%`,background:cc(plat.crash),borderRadius:2}}/></div>}
+                      </div>
+                      <div style={{flex:"0 0 95px"}}>
+                        <div style={{...m,fontSize:12,fontWeight:700,color:cc(plat.anr!==null?plat.anr*3:null)}}>{cl(plat.anr)}</div>
+                        <div style={{...m,fontSize:8,color:"#4a6080",marginTop:1}}>ANR</div>
+                        {plat.anr!==null&&<div style={{height:3,background:"#1a2540",borderRadius:2,marginTop:3,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(plat.anr*100,100)}%`,background:cc(plat.anr*3),borderRadius:2}}/></div>}
+                      </div>
+                      <div style={{flex:"0 0 130px",display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{...m,fontSize:11,fontWeight:700,color:roCol,width:34,flexShrink:0}}>{plat.rollout}%</span>
+                        <div style={{flex:1,height:5,background:"#1a2540",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${plat.rollout}%`,background:roGrad,borderRadius:3,transition:"width .5s",boxShadow:plat.rollout===100?`0 0 7px ${roCol}55`:"none"}}/>
+                        </div>
+                        {plat.force&&<span style={{...m,fontSize:9,color:"#ff3355",fontWeight:700}}>⚡</span>}
+                      </div>
+                      <div style={{display:"flex",gap:5,marginLeft:"auto"}} onClick={e=>e.stopPropagation()}>
+                        <button onClick={()=>setForceModal(plat)} style={{display:"inline-flex",alignItems:"center",gap:3,background:plat.force?"rgba(255,51,85,.2)":"rgba(255,51,85,.08)",border:`1px solid ${plat.force?"#ff3355":"rgba(255,51,85,.25)"}`,borderRadius:5,padding:"4px 9px",cursor:"pointer",...m,fontSize:9,fontWeight:700,color:"#ff3355",whiteSpace:"nowrap",boxShadow:plat.force?"0 0 8px rgba(255,51,85,.35)":"none"}}>
+                          {plat.force?"⚡ FORCED":"⚡ Force"}
+                        </button>
+                        {hasGuide&&<button onClick={()=>setDeployModal(plat.id)} style={{display:"inline-flex",alignItems:"center",gap:3,background:"rgba(0,212,255,.07)",border:"1px solid rgba(0,212,255,.2)",borderRadius:5,padding:"4px 9px",cursor:"pointer",...m,fontSize:9,color:"#00d4ff"}}>🚀</button>}
+                      </div>
+                      <div style={{flex:"1 1 130px",minWidth:0}}>
+                        {plat.remarks?<div style={{fontSize:10,color:"#4a6080",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={plat.remarks}>{plat.remarks}</div>:<span style={{...m,fontSize:9,color:"#2d4060",fontStyle:"italic"}}>—</span>}
+                        <div style={{...m,fontSize:9,color:"#2d4060",marginTop:1}}>{plat.lastUpdated}</div>
+                      </div>
+                    </div>
+                    {(plat.status==="rejected"||plat.status==="review")&&plat.remarks&&(
+                      <div style={{borderTop:`1px solid ${plat.status==="rejected"?"rgba(255,51,85,.2)":"rgba(255,171,0,.15)"}`,background:plat.status==="rejected"?"rgba(255,51,85,.04)":"rgba(255,171,0,.04)",padding:"7px 14px",display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:11}}>{plat.status==="rejected"?"❌":"🔄"}</span>
+                        <span style={{fontSize:11,color:plat.status==="rejected"?"#ff3355":"#ffab00",flex:1}}>{plat.remarks}</span>
+                        {hasGuide&&<button onClick={()=>setDeployModal(plat.id)} style={{padding:"3px 10px",borderRadius:5,border:`1px solid ${plat.status==="rejected"?"rgba(255,51,85,.3)":"rgba(255,171,0,.3)"}`,background:"transparent",color:plat.status==="rejected"?"#ff3355":"#ffab00",cursor:"pointer",fontSize:10,fontWeight:700,flexShrink:0,fontFamily:"'Rajdhani',sans-serif"}}>🚀 Fix Guide</button>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>}
+
+          {tab==="deploy"&&(
+            <div>
+              <div style={{background:"rgba(0,85,255,.06)",border:"1px solid rgba(0,85,255,.2)",borderRadius:11,padding:"13px 16px",marginBottom:18,display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontSize:22}}>🚀</span>
+                <div>
+                  <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>Step-by-Step Deployment Guide</div>
+                  <div style={{fontSize:11,color:"#4a6080",marginTop:2}}>Click any platform card to see full deployment steps, CLI commands, and current progress.</div>
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
+                {platforms.map(plat=>{
+                  const p=PLATFORMS[plat.id];
+                  const guide=DEPLOY_GUIDE[plat.id];
+                  const done=guide?guide.filter(s=>s.status==="done").length:0;
+                  const total=guide?guide.length:0;
+                  const pct=total?Math.round((done/total)*100):0;
+                  return (
+                    <div key={plat.id} onClick={()=>guide&&setDeployModal(plat.id)}
+                      style={{background:"#0a0f1e",border:`1px solid ${p.border}`,borderRadius:11,padding:14,cursor:guide?"pointer":"default",transition:"all .2s",opacity:guide?1:.5}}
+                      onMouseEnter={e=>{if(guide)e.currentTarget.style.background="#0f1628";}}
+                      onMouseLeave={e=>{if(guide)e.currentTarget.style.background="#0a0f1e";}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                        <div style={{display:"flex",alignItems:"center",gap:9}}>
+                          <div style={{width:34,height:34,borderRadius:8,background:p.bg,border:`1px solid ${p.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{p.icon}</div>
+                          <div><div style={{fontWeight:700,color:"#fff",fontSize:13}}>{p.name}</div><div style={{marginTop:3}}><Badge status={plat.status} small/></div></div>
+                        </div>
+                        {guide&&<span style={{color:"#4a6080",fontSize:16}}>›</span>}
+                      </div>
+                      {guide?(<>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                          <span style={{...m,fontSize:8,color:"#4a6080",letterSpacing:1}}>PROGRESS</span>
+                          <span style={{...m,fontSize:9,color:pct===100?"#00e676":pct>0?"#00d4ff":"#4a6080",fontWeight:700}}>{done}/{total} done</span>
+                        </div>
+                        <div style={{height:4,background:"#1a2540",borderRadius:2,overflow:"hidden",marginBottom:8}}>
+                          <div style={{height:"100%",width:`${pct}%`,background:pct===100?"linear-gradient(90deg,#00bfa5,#00e676)":"linear-gradient(90deg,#0055ff,#00d4ff)",borderRadius:2,transition:"width .5s"}}/>
+                        </div>
+                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {guide.slice(0,3).map((step,i)=>(
+                            <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11}}>
+                              <span style={{color:sc(step.status),fontSize:11}}>{step.status==="done"?"✓":step.status==="active"?"►":"○"}</span>
+                              <span style={{color:step.status==="done"?"#64748b":step.status==="active"?"#c8d8f0":"#2d4060"}}>{step.title}</span>
+                            </div>
+                          ))}
+                          {guide.length>3&&<div style={{fontSize:9,...m,color:"#4a6080",marginTop:2}}>+{guide.length-3} more steps →</div>}
+                        </div>
+                      </>):<div style={{fontSize:11,color:"#4a6080",fontStyle:"italic"}}>Guide coming soon</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {detail&&<DetailModal plat={detail} onClose={()=>setDetail(null)} onForce={p=>{setDetail(null);setForceModal(p);}} onDeploy={id=>{setDetail(null);setDeployModal(id);setTab("deploy");}}/>}
+      {forceModal&&<ForceModal platform={forceModal} onConfirm={handleForceConfirm} onClose={()=>setForceModal(null)}/>}
+      {deployModal&&<DeployModal platformId={deployModal} onClose={()=>setDeployModal(null)}/>}
+      {toast&&<div style={{position:"fixed",bottom:20,right:20,background:"#0f1628",border:"1px solid #243050",borderRadius:9,padding:"9px 15px",fontSize:12,zIndex:9999,display:"flex",alignItems:"center",gap:6,boxShadow:"0 8px 24px rgba(0,0,0,.4)",color:"#c8d8f0",animation:"fadeIn .25s ease"}}><span>{toast.icon}</span><span>{toast.msg}</span></div>}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<Dashboard/>);
+</script>
+</body>
+</html>
