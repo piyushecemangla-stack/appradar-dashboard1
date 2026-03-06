@@ -154,7 +154,7 @@ function LoginModal({store, onSuccess, onClose}){
   const[vals,setVals]=useState({});
   const[loading,setLoading]=useState(false);
   const[error,setError]=useState("");
-  const[step,setStep]=useState("form"); // form | otp | success
+  const[step,setStep]=useState("form"); // form | success
 
   const handleLogin=async()=>{
     // validate
@@ -167,31 +167,12 @@ function LoginModal({store, onSuccess, onClose}){
     // simulate auth (in production this hits your backend server)
     await new Promise(r=>setTimeout(r,1800));
 
-    // For Google / Apple — simulate 2FA step
-    if(store.id==="gp"||store.id==="as"){
-      setStep("otp");
-      setLoading(false);
-      return;
-    }
-
-    // for other stores — direct login
+    // direct login for all stores
     setStep("success");
     setLoading(false);
     setTimeout(()=>onSuccess(store.id, DEMO_DATA[store.id]),800);
   };
-
-  const handleOtp=(otp)=>{
-    if(otp.length===6){
-      setLoading(true);
-      setTimeout(()=>{
-        setStep("success");
-        setLoading(false);
-        setTimeout(()=>onSuccess(store.id, DEMO_DATA[store.id]),800);
-      },1200);
-    }
-  };
-
-  return(
+return(
     <div onClick={e=>e.target===e.currentTarget&&onClose()}
       style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",backdropFilter:"blur(10px)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
       <div style={{background:"#0a0f1e",border:`1px solid ${store.border}`,borderRadius:20,width:"100%",maxWidth:460,animation:"fadeIn .3s ease",overflow:"hidden"}}>
@@ -258,28 +239,7 @@ function LoginModal({store, onSuccess, onClose}){
             </div>
           </>}
 
-          {/* OTP STEP */}
-          {step==="otp"&&<>
-            <div style={{textAlign:"center",marginBottom:20}}>
-              <div style={{fontSize:40,marginBottom:10}}>📱</div>
-              <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:6}}>Two-Factor Authentication</div>
-              <div style={{fontSize:12,color:"#4a6080",lineHeight:1.6}}>
-                {store.id==="gp"?"Check your phone for a Google verification code":"Check your phone or email for the Apple verification code"}
-              </div>
-            </div>
-            <div style={{...mn,fontSize:9,color:"#4a6080",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:8}}>ENTER 6-DIGIT CODE</div>
-            <input
-              type="text" maxLength={6} placeholder="000000"
-              onChange={e=>handleOtp(e.target.value.replace(/\D/g,""))}
-              style={{width:"100%",background:"#0f1628",border:`1px solid ${store.color}`,borderRadius:9,padding:"14px",color:"#fff",fontSize:22,outline:"none",textAlign:"center",letterSpacing:8,...mn}}
-              autoFocus
-            />
-            {loading&&<div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:14,color:"#4a6080",fontSize:12}}>
-              <span style={{width:14,height:14,border:"2px solid rgba(255,255,255,.2)",borderTopColor:store.color,borderRadius:"50%",display:"inline-block",animation:"spin 0.8s linear infinite"}}/>
-              Verifying code…
-            </div>}
-            <button onClick={()=>setStep("form")} style={{width:"100%",padding:10,borderRadius:8,border:"1px solid #1a2540",background:"transparent",color:"#4a6080",cursor:"pointer",fontSize:13,fontWeight:600,marginTop:12,fontFamily:"'Rajdhani',sans-serif"}}>← Back</button>
-          </>}
+          
 
           {/* SUCCESS STEP */}
           {step==="success"&&<div style={{textAlign:"center",padding:"20px 0"}}>
