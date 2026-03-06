@@ -1,0 +1,12 @@
+{
+  "lastUpdated": "2026-03-06T00:00:00.000Z",
+  "note": "This file is auto-updated nightly by GitHub Actions. Edit secrets in repo Settings to connect your stores.",
+  "platforms": {
+    "google_play": { "connected": false },
+    "app_store":   { "connected": false },
+    "fire_tv":     { "connected": false },
+    "samsung":     { "connected": false },
+    "lg":          { "connected": false },
+    "roku":        { "connected": false }
+  }
+}
